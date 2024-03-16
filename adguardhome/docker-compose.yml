@@ -1,0 +1,123 @@
+version: '3.9'
+name: adguardhome
+# AdGuard Home stack
+
+# ISC DHCP Relay Agent
+#
+# Page: https://linux.die.net/man/8/dhcrelay
+# Repo: https://github.com/modem7/DHCP-Relay
+# Dckr: https://hub.docker.com/r/modem7/dhcprelay
+# Cmps: https://github.com/modem7/DHCP-Relay#configuration
+#
+# The Internet Systems Consortium DHCP Relay Agent, dhcrelay, provides a means
+# for relaying DHCP and BOOTP requests from a subnet to which no DHCP server is
+# directly connected to one or more DHCP servers on other subnets. It supports
+# both DHCPv4/BOOTP and DHCPv6 protocols.
+
+# AdGuard Home
+#
+# Page: https://adguard.com/en/adguard-home/overview.html
+# Repo: https://github.com/AdguardTeam/AdGuardHome
+# Dckr: https://hub.docker.com/r/adguard/adguardhome
+# Cmps: https://github.com/actualbudget/actual-server/blob/master/docker-compose.yml
+#
+# AdGuard Home is a network-wide software for blocking ads & tracking. After you
+# set it up, it’ll cover ALL your home devices, and you don’t need any
+# client-side software for that. With the rise of Internet-Of-Things and
+# connected devices, it becomes more and more important to be able to control
+# your whole network.
+
+services:
+
+  dhcprelay:
+    image: modem7/dhcprelay:${DHCPRELAY_TAG:-latest}
+    container_name: dhcprelay
+    command: ["-d", "-i", "eno1", "-i", "br_adguard", "10.0.0.10"]
+    cap_add:
+      - NET_ADMIN
+    network_mode: host
+    restart: always
+    mem_limit: 32m
+    mem_reservation: 8m
+
+  adguardhome:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    hostname: ${COMPOSE_PROJECT_NAME}
+    image: adguard/adguardhome:${ADGUARDHOME_TAG:-latest}
+    volumes:
+      - /etc/${COMPOSE_PROJECT_NAME}:/opt/adguardhome/conf
+      - /srv/${COMPOSE_PROJECT_NAME}:/opt/adguardhome/work
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    ports:
+      - 3000:3000/tcp # Web UI
+    restart: always
+    privileged: true
+    networks:
+      default:
+        ipv4_address: 10.0.0.10
+      proxy:
+      exposed:
+    dns:
+      - 127.0.0.1
+      - 1.1.1.1
+      - 1.0.0.1
+      - 9.9.9.9
+    labels:
+      - "traefik.enable=true"
+      # Admin panel
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${NETWORK_DOMAIN:?Netowrk domain is not defined}`) || Host(`${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine domain is not defined}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=3000"
+      # DNS-over-HTTPS
+      - "traefik.http.routers.dns-over-https.rule=Headers(`accept`, `application/dns-json`) || Host(`dns.${NETWORK_DOMAIN}`) || Host(`dns.${MACHINE_DOMAIN}`)"
+      - "traefik.http.routers.dns-over-https.tls=true"
+      - "traefik.http.routers.dns-over-https.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.dns-over-https.service=dns-over-https"
+      - "traefik.http.routers.dns-over-https.entrypoints=http,https"
+      - "traefik.http.services.dns-over-https.loadbalancer.server.port=443"
+      - "traefik.http.services.dns-over-https.loadbalancer.server.scheme=https"
+      # Plain DNS (TCP)
+      - "traefik.tcp.routers.dns-tcp.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.dns-tcp.service=dns-tcp"
+      - "traefik.tcp.routers.dns-tcp.entrypoints=dns-tcp"
+      - "traefik.tcp.services.dns-tcp.loadbalancer.server.port=53"
+      # Plain DNS (UDP)
+      - "traefik.udp.routers.dns-udp.service=dns-udp"
+      - "traefik.udp.routers.dns-udp.entrypoints=dns-udp"
+      - "traefik.udp.services.dns-udp.loadbalancer.server.port=53"
+      # DNS-over-TLS
+      - "traefik.tcp.routers.dns-over-tls.rule=HostSNI(`dns.${NETWORK_DOMAIN}`) || HostSNI(`dns.${MACHINE_DOMAIN}`)"
+      - "traefik.tcp.routers.dns-over-tls.tls=true"
+      - "traefik.http.routers.dns-over-tls.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.tcp.routers.dns-over-tls.service=dns-over-tls"
+      - "traefik.tcp.routers.dns-over-tls.entrypoints=dns-over-tls"
+      - "traefik.tcp.services.dns-over-tls.loadbalancer.server.port=853"
+      # DNS-over-QUIC
+      - "traefik.udp.routers.dns-over-quic.service=dns-over-quic"
+      - "traefik.udp.routers.dns-over-quic.entrypoints=dns-over-quic"
+      - "traefik.udp.services.dns-over-quic.loadbalancer.server.port=853"
+      # DNSCrypt (TCP)
+      - "traefik.tcp.routers.dnscrypt-tcp.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.dnscrypt-tcp.service=dnscrypt-tcp"
+      - "traefik.tcp.routers.dnscrypt-tcp.entrypoints=dnscrypt-tcp"
+      - "traefik.tcp.services.dnscrypt-tcp.loadbalancer.server.port=5443"
+      # DNSCrypt (UDP)
+      - "traefik.udp.routers.dnscrypt-udp.service=dnscrypt-udp"
+      - "traefik.udp.routers.dnscrypt-udp.entrypoints=dnscrypt-udp"
+      - "traefik.udp.services.dnscrypt-udp.loadbalancer.server.port=5443"
+
+networks:
+  default:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br_adguard
+    ipam:
+      config:
+        - subnet: 10.0.0.0/24
+  proxy:
+    external: true
+  exposed:
+    external: true

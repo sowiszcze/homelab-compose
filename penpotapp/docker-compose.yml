@@ -1,0 +1,123 @@
+version: "3.9"
+name: penpotapp
+# Penpot stack
+
+# Penpot
+#
+# Page: https://penpot.app/
+# Code: https://github.com/penpot
+# Dckr: https://hub.docker.com/u/penpotapp
+# Cmps: https://github.com/penpot/penpot/blob/develop/docker/images/docker-compose.yaml
+#
+# Penpot is the first Open Source design and prototyping platform meant for
+# cross-domain teams. Non dependent on operating systems, Penpot is web based
+# and works with open standards (SVG). Penpot invites designers all over the
+# world to fall in love with open source while getting developers excited about
+# the design process in return.
+
+services:
+
+  frontend:
+    image: penpotapp/frontend:${PENPOT_FRONTEND_TAG:-latest}
+    restart: unless-stopped
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/assets:/opt/data/assets
+    depends_on:
+      - backend
+      - exporter
+    networks:
+      - default
+      - proxy
+    environment:
+      - PENPOT_FLAGS
+    labels:
+      - "traefik.enable=true"
+
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=80"
+
+  backend:
+    image: penpotapp/backend:${PENPOT_BACKEND_TAG:-latest}
+    restart: unless-stopped
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/assets:/opt/data/assets
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - default
+    environment:
+      - PENPOT_FLAGS
+      - PENPOT_SECRET_KEY
+      - PENPOT_PREPL_HOST
+      - PENPOT_PUBLIC_URI
+      - PENPOT_DATABASE_URI
+      - PENPOT_DATABASE_USERNAME
+      - PENPOT_DATABASE_PASSWORD
+      - PENPOT_REDIS_URI
+      - PENPOT_ASSETS_STORAGE_BACKEND
+      - PENPOT_STORAGE_ASSETS_FS_DIRECTORY
+      - PENPOT_TELEMETRY_ENABLED
+      - PENPOT_SMTP_DEFAULT_FROM
+      - PENPOT_SMTP_DEFAULT_REPLY_TO
+      - PENPOT_SMTP_HOST
+      - PENPOT_SMTP_PORT
+      - PENPOT_SMTP_USERNAME
+      - PENPOT_SMTP_PASSWORD
+      - PENPOT_SMTP_TLS
+      - PENPOT_SMTP_SSL
+
+  exporter:
+    image: penpotapp/exporter:${PENPOT_EXPORTER_TAG:-latest}
+    restart: unless-stopped
+    networks:
+      - default
+    environment:
+      - PENPOT_PUBLIC_URI
+      - PENPOT_REDIS_URI
+
+  postgres:
+    image: postgres:${PENPOT_POSTGRES_TAG:-15}
+    restart: unless-stopped
+    stop_signal: SIGINT
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/postgres:/var/lib/postgresql/data
+    networks:
+      - default
+    environment:
+      - POSTGRES_INITDB_ARGS
+      - POSTGRES_DB
+      - POSTGRES_USER
+      - POSTGRES_PASSWORD
+
+  redis:
+    image: redis:${PENPOT_REDIS_TAG:-7}
+    restart: unless-stopped
+    networks:
+      - default
+
+  mailcatch:
+    image: sj26/mailcatcher:${PENPOT_MAILCATCHER_TAG:-latest}
+    restart: unless-stopped
+    ports:
+      - "30974:1080"
+    networks:
+      - default
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}-mailcatch.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}-mailcatch.service=${COMPOSE_PROJECT_NAME}-mailcatch"
+      - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}-mailcatch.entrypoints=${COMPOSE_PROJECT_NAME}-mailcatch"
+      - "traefik.tcp.services.${COMPOSE_PROJECT_NAME}-mailcatch.loadbalancer.server.port=1080"
+
+networks:
+  default:
+  proxy:
+    external: true
+  smtp:
+    external: true

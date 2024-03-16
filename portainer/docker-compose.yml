@@ -1,0 +1,60 @@
+version: '3.9'
+name: portainer
+# Portainer stack
+
+# Portainer
+#
+# Page: https://www.portainer.io/
+# Repo: https://github.com/portainer/portainer
+# Dckr: https://hub.docker.com/u/portainer
+# Cmps: https://docs.portainer.io/start/install-ce/server/docker/linux
+#
+# Irrespective of your industry, orchestration platform, or computing device,
+# Portainer is the most versatile container management software that simplifies
+# your secure adoption of containers with remarkable speed.
+
+services:
+
+  agent:
+    image: portainer/agent:${PORTAINER_AGENT_TAG:-latest}
+    networks:
+      - default
+      - exposed
+    ports:
+      - 127.0.0.1:9001:9001
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker/volumes:/var/lib/docker/volumes
+    restart: always
+
+  server:
+    image: portainer/portainer-ce:${PORTAINER_TAG:-latest}
+    networks:
+      - default
+      - exposed
+      - proxy
+    ports:
+      - 127.0.0.1:9000:9000
+    extra_hosts:
+      host.docker.internal: ${PORTAINER_DOCKER_ROUTER}
+    env_file:
+      - .env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /srv/${COMPOSE_PROJECT_NAME}:/data
+    restart: always
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=9000"
+
+networks:
+  default:
+  proxy:
+    external: true
+  exposed:
+    external: true

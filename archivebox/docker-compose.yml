@@ -1,0 +1,84 @@
+version: '3.9'
+name: archivebox
+# ArchiveBox stack
+
+# ArchiveBox
+#
+# Page: https://archivebox.io/
+# Repo: https://github.com/ArchiveBox/ArchiveBox
+# Dckr: https://hub.docker.com/r/archivebox/archivebox
+# Cmps: https://github.com/ArchiveBox/ArchiveBox/blob/main/docker-compose.yml
+#
+# An open source tool that lets organizations & individuals archive both public
+# & private web content while retaining control over their data. It can be used
+# to save copies of bookmarks, preserve evidence for legal cases, backup photos
+# from FB/Insta/Flickr or media from YT/Soundcloud/etc., save research papers,
+# and more...
+
+services:
+
+  archivebox:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: archivebox/archivebox:${ARCHIVEBOX_VERSION:-dev}
+    command: server --quick-init 0.0.0.0:8000
+    restart: unless-stopped
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}:/data
+      - /etc/${COMPOSE_PROJECT_NAME}/cron:/var/spool/cron/crontabs
+    environment:
+      - ALLOWED_HOSTS=*
+      - PUBLIC_INDEX=False
+      - PUBLIC_SNAPSHOTS=False
+      - PUBLIC_ADD_VIEW=False
+      - ADMIN_USERNAME=${ARCHIVEBOX_ADMIN_USER:-admin}
+      - ADMIN_PASSWORD=${ARCHIVEBOX_ADMIN_PASS:-SomeSecretPassword}
+      - SEARCH_BACKEND_ENGINE=sonic
+      - SEARCH_BACKEND_HOST_NAME=${COMPOSE_PROJECT_NAME}-sonic
+      - SEARCH_BACKEND_PASSWORD=${ARCHIVEBOX_SONIC_PASS:-SomeSecretPassword}
+      - MEDIA_MAX_SIZE=1g
+      - CHECK_SSL_VALIDITY=${ARCHIVEBOX_VALIDATE_CERT:-True}
+      - SAVE_ARCHIVE_DOT_ORG=${ARCHIVEBOX_PUBLISH:-True}
+    networks:
+      - default
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8000"
+
+  sonic:
+    container_name: ${COMPOSE_PROJECT_NAME}-sonic
+    image: valeriansaliou/sonic:${ARCHIVEBOX_SONIC_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      - SEARCH_BACKEND_PASSWORD=${ARCHIVEBOX_SONIC_PASS:-SomeSecretPassword}
+    volumes:
+      - /etc/${COMPOSE_PROJECT_NAME}/sonic.cfg:/etc/sonic.cfg:ro
+      - /srv/${COMPOSE_PROJECT_NAME}/sonic:/var/lib/sonic/store
+    networks:
+      - default
+
+  archivebox_scheduler:
+    container_name: ${COMPOSE_PROJECT_NAME}-scheduler
+    image: archivebox/archivebox:${ARCHIVEBOX_TAG:-dev}
+    restart: unless-stopped
+    command: schedule --foreground
+    environment:
+      - MEDIA_MAX_SIZE=1g
+      - ONLY_NEW=False
+      - CHECK_SSL_VALIDITY=${ARCHIVEBOX_VALIDATE_CERT:-True}
+      - SAVE_ARCHIVE_DOT_ORG=${ARCHIVEBOX_PUBLISH:-True}
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}:/data
+      - /etc/${COMPOSE_PROJECT_NAME}/cron:/var/spool/cron/crontabs
+    networks:
+      - default
+
+networks:
+  default:
+  proxy:
+    external: true

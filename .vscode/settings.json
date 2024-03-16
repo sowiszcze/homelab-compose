@@ -1,7 +1,8 @@
 {
     "files.associations": {
       "**/*.yml.template": "yaml",
-      "**/*.yaml.template": "yaml"
+      "**/*.yaml.template": "yaml",
+      "**/*.env.template": "env"
     },
     "editor.tabSize": 2
   }

@@ -1,0 +1,73 @@
+version: '3.9'
+name: red-discordbot
+# Red-DiscordBot stack
+
+# Red-DiscordBot
+#
+# Page: https://docs.discord.red/
+# Code: https://github.com/Cog-Creators/Red-DiscordBot
+# Dckr: https://github.com/PhasecoreX/docker-red-discordbot
+# Cmps: https://github.com/PhasecoreX/docker-red-discordbot#docker-compose
+#
+# Red is a fully modular bot – meaning all features and commands can be
+# enabled/disabled to your liking, making it completely customizable. This is
+# a self-hosted bot – meaning you will need to host and maintain your own
+# instance. You can turn Red into an admin bot, music bot, trivia bot, new best
+# friend or all of these together!
+
+services:
+
+  red-discordbot:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: phasecorex/red-discordbot:${RED_TAG:-full}
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    healthcheck:
+      test: 'xargs -0 < /proc/$$(pidof -s python)/cmdline | grep -iqE "\sredbot\s" && grep -iqE "^state:\s+[rds]" /proc/$$(pidof -s python)/status || exit 1'
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/data:/data
+    environment:
+      - TOKEN
+      - PREFIX
+      - TZ
+      - STORAGE_TYPE
+    networks:
+      - external_network
+      - internal_network
+
+  postgres:
+    container_name: ${COMPOSE_PROJECT_NAME}-postgres
+    image: postgres:${RED_POSTGRES_TAG:-15-alpine}
+    restart: unless-stopped
+    healthcheck:
+      test: pg_isready -q || exit 1
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/postgres:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD
+      - POSTGRES_USER
+      - POSTGRES_DB
+    networks:
+      - internal_network
+
+  #setup:
+  #  image: phasecorex/red-discordbot:${RED_TAG:-full}
+  #  depends_on:
+  #    - postgres
+  #  entrypoint: ['/bin/sh', '-c', 'sed -i "s/\"DATA_PATH\": \".*\",$$/\"DATA_PATH\": \"\/data\",/m" /data/config.json && sed -i "s/\"${SOURCE_INSTANCE}\":\s*{$$/\"docker\": {/m" /data/config.json && cat /data/config.json && echo "" && redbot-setup convert docker postgres']
+  #  restart: "no"
+  #  stdin_open: true
+  #  tty: true
+  #  volumes:
+  #    - /srv/${COMPOSE_PROJECT_NAME}/data:/data
+  #  environment:
+  #    - TOKEN
+  #    - PREFIX
+  #    - TZ
+  #    - STORAGE_TYPE
+
+networks:
+  external_network:
+  internal_network:
+    internal: true

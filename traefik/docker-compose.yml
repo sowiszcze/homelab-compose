@@ -1,0 +1,83 @@
+version: '3.9'
+name: traefik
+# Traefik Proxy stack
+
+# Traefik Proxy
+#
+# Page: https://traefik.io/traefik/
+# Repo: https://github.com/traefik/traefik/
+# Dckr: https://hub.docker.com/_/traefik
+# Cmps: https://doc.traefik.io/traefik/getting-started/quick-start/
+#
+# Traefik is a leading modern reverse proxy and load balancer that makes
+# deploying microservices easy. Traefik integrates with your existing
+# infrastructure components and configures itself automatically and dynamically.
+
+services:
+
+  traefik:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: traefik:${TRAEFIK_TAG:-latest}
+    networks:
+      - proxy
+      - exposed
+    healthcheck:
+      test: "(ps -o comm | grep -q -m 1 traefik) || exit 1"
+    extra_hosts:
+      host.docker.internal: ${TRAEFIK_DOCKER_ROUTER}
+    ports:
+      - "80:80"         # http
+      - "443:443"       # https
+      - "3102:3102"     # VaultWarden WebSocket
+      - "1080:1080"     # Penpot mailcatcher
+      - "9200:9200"     # Mastodon - ElasticSearch
+      - "4000:4000"     # Mastodon - streaming
+      - "53:53/tcp"     # dns-tcp
+      - "53:53/udp"     # dns-udp
+      - "853:853/tcp"   # dns-over-tls
+      - "853:853/udp"   # dns-over-quic
+      - "5443:5443/tcp" # dnscrypt-tcp
+      - "5443:5443/udp" # dnscrypt-udp
+      - "6800:6800/tcp" # aria-rpc-tcp
+      - "6800:6800/udp" # aria-rpc-udp
+      - "6888:6888"     # bittorrent
+      - "5672:5672"     # amqp
+      - "5671:5671"     # amqps
+      - "4369:4369"     # epmd
+      - "5552:5552"     # rabbit-stream
+      - "5551:5551"     # rabbit-stream-tls
+      - "61613:61613"   # stomp
+      - "61614:61614"   # stomp-tls
+      - "1883:1883"     # mqtt
+      - "8883:8883"     # mqtt-tls
+      - "15674:15674"   # stomp-ws
+      - "15675:15675"   # mqtt-ws
+      - "6379:6379"     # redis
+      - "8554:8554"     # rtsp
+      - "8555:8555/tcp" # webrtc-over-tcp
+      - "8555:8555/udp" # webrtc-over-udp
+    environment:
+      - OVH_APPLICATION_KEY
+      - OVH_APPLICATION_SECRET
+      - OVH_CONSUMER_KEY
+      - OVH_ENDPOINT
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/${COMPOSE_PROJECT_NAME}:/etc/traefik
+      - /var/log/${COMPOSE_PROJECT_NAME}:/log
+      - /etc/letsencrypt:/etc/letsencrypt
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine FQDN is not defined}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=authentik@file"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=api@internal"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+
+networks:
+  proxy:
+    external: true
+  exposed:
+    external: true

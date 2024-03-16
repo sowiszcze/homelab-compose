@@ -1,0 +1,70 @@
+version: '3.9'
+name: ghost
+# Ghost stack
+
+# Ghost
+#
+# Page: https://ghost.org/
+# Repo: https://github.com/tryghost/ghost
+# Dckr: https://hub.docker.com/_/ghost/
+# Cmps: https://github.com/docker-library/docs/tree/master/ghost#-via-docker-compose-or-docker-stack-deploy
+#
+# Independent technology for modern publishing, memberships, subscriptions and
+# newsletters.
+
+services:
+
+  ghost:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: ghost:${GHOST_VERSION:-5-alpine}
+    restart: unless-stopped
+    environment:
+      # see https://ghost.org/docs/config/#configuration-options
+      url: https://${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}
+      database__client: ${GHOST_DB_ENGINE:-mysql}
+      database__connection__host: ${GHOST_DB_HOST:-db}
+      database__connection__user: ${GHOST_DB_USER:-root}
+      database__connection__password: ${GHOST_DB_PASS:?Database password has to be set}
+      database__connection__database: ${GHOST_DB_NAME:-ghost}
+      mail__from: ${GHOST_MAIL_FROM:-support@example.com}
+      mail__transport: ${GHOST_MAIL_TRANSPORT:-SMTP}
+      mail__options__service: ${GHOST_MAIL_SERVICE}
+      mail__options__host: ${GHOST_MAIL_HOST}
+      mail__options__port: ${GHOST_MAIL_PORT:-465}
+      mail__options__secure: ${GHOST_MAIL_USETLS:-true}
+      mail__options__auth__user: ${GHOST_MAIL_USER}
+      mail__options__auth__pass: ${GHOST_MAIL_PASS}
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/content:/var/lib/ghost/content
+    networks:
+      - default
+      - proxy
+      - smtp
+    depends_on:
+      - db
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=2368"
+
+  db:
+    container_name: ${COMPOSE_PROJECT_NAME}-db
+    image: mysql:${GHOST_DB_VERSION:-8.0}
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${GHOST_DB_PASS}
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/db:/var/lib/mysql
+    networks:
+      - default
+
+networks:
+  default:
+  proxy:
+    external: true
+  smtp:
+    external: true

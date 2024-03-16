@@ -1,0 +1,57 @@
+version: '3.9'
+name: netbootxyz
+# Netbootxyz stack
+
+# Netbootxyz
+#
+# Page: https://netboot.xyz/
+# Repo: https://github.com/netbootxyz/docker-netbootxyz
+# Dckr: https://github.com/netbootxyz/docker-netbootxyz/pkgs/container/netbootxyz
+# Cmps: https://github.com/netbootxyz/docker-netbootxyz/blob/master/docker-compose.yml.example
+#
+# netboot.xyz is a convenient place to boot into any type of operating system or
+# utility disk without the need of having to go spend time retrieving the ISO
+# just to run it. iPXE is used to provide a user friendly menu from within the
+# BIOS that lets you easily choose the operating system you want along with any
+# specific types of versions or bootable flags.
+
+services:
+
+  netbootxyz:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: ghcr.io/netbootxyz/netbootxyz:${NETBOOT_TAG:-latest}
+    volumes:
+      - /etc/${COMPOSE_PROJECT_NAME}:/config
+      - /srv/${COMPOSE_PROJECT_NAME}:/assets
+    networks:
+      - exposed
+      - proxy
+    ports:
+      - 69:69/udp # nice
+    restart: unless-stopped
+    cap_add: # More info: https://github.com/samdbmg/dhcp-netboot.xyz
+      - NET_ADMIN
+    healthcheck:
+      test: "(ps -o comm | grep -q -m 1 tftpd) && (ps -o comm | grep -q -m 1 nginx) && (curl --fail --silent http://localhost/ > /dev/null) || exit 1"
+    labels:
+      - "traefik.enable=true"
+      # Web UI
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-ui.rule=Host(`${COMPOSE_PROJECT_NAME}-assets.${NETWORK_DOMAIN:?Netowrk domain is not defined}`) || Host(`${COMPOSE_PROJECT_NAME}-assets.${MACHINE_DOMAIN:?Machine domain is not defined}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-ui.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-ui.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-ui.service=${COMPOSE_PROJECT_NAME}-ui"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-ui.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}-ui.loadbalancer.server.port=80"
+      # Assets
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-assets.rule=Host(`${COMPOSE_PROJECT_NAME}.${NETWORK_DOMAIN}`) || Host(`${COMPOSE_PROJECT_NAME}-ui.${NETWORK_DOMAIN}`) || Host(`${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN}`) || Host(`${COMPOSE_PROJECT_NAME}-ui.${MACHINE_DOMAIN}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-assets.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-assets.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-assets.service=${COMPOSE_PROJECT_NAME}-assets"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-assets.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}-assets.loadbalancer.server.port=3000"
+
+networks:
+  exposed:
+    external: true
+  proxy:
+    external: true

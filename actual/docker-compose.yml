@@ -1,0 +1,41 @@
+version: '3.9'
+name: actual
+# Actual Budget stack
+
+# Actual Budget
+#
+# Page: https://actualbudget.org/
+# Repo: https://github.com/actualbudget/actual
+# Dckr: https://hub.docker.com/r/actualbudget/actual-server
+# Cmps: https://github.com/actualbudget/actual-server/blob/master/docker-compose.yml
+#
+# A super fast and privacy-focused app for managing your finances. At its heart
+# is the well proven and much loved Envelope Budgeting methodology.
+# You own your data and can do whatever you want with it. Featuring multi-device
+# sync, optional end-to-end encryption and so much more.
+
+services:
+
+  actualbudget:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: docker.io/actualbudget/actual-server:${ACTUAL_TAG:-latest}
+    restart: unless-stopped
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}:/data
+    networks:
+      - proxy
+      - exposed
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=5006"
+
+networks:
+  proxy:
+    external: true
+  exposed:
+    external: true

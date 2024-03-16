@@ -1,0 +1,43 @@
+version: '3.9'
+name: dockge
+# Dockge stack
+
+# Dockge
+#
+# Page: https://dockge.kuma.pet/
+# Repo: https://github.com/louislam/dockge
+# Dckr: https://hub.docker.com/r/louislam/dockge
+# Cmps: https://github.com/louislam/dockge/blob/master/compose.yaml
+#
+# A fancy, easy-to-use and reactive self-hosted docker compose.yaml
+# stack-oriented manager.
+
+services:
+
+  dockge:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: louislam/dockge:${DOCKGE_VERSION:-1}
+    restart: unless-stopped
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}:/app/data
+      - /var/docker/stacks:/opt/stacks
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - DOCKGE_STACKS_DIR=/opt/stacks
+    networks:
+      - exposed
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=5001"
+
+networks:
+  exposed:
+    external: true
+  proxy:
+    external: true

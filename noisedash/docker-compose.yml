@@ -1,0 +1,40 @@
+version: '3.9'
+name: noisedash
+# Noisedash stack
+
+# Noisedash
+#
+# Page: N/A
+# Code: https://github.com/kaythomas0/noisedash
+# Dckr: https://hub.docker.com/r/noisedash/noisedash
+# Cmps: https://github.com/kaythomas0/noisedash/blob/main/docker-compose.yml
+#
+# Self-hostable web tool for generating ambient noises.
+
+services:
+
+  noisedash:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: noisedash/noisedash:${NOISEDASH_TAG:-latest}
+    restart: unless-stopped
+    networks:
+      - proxy
+      - exposed
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}:/var/noisedash/db
+      - /var/${COMPOSE_PROJECT_NAME}:/var/noisedash/samples
+      - /etc/${COMPOSE_PROJECT_NAME}:/var/noisedash/config
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=1432"
+
+networks:
+  proxy:
+    external: true
+  exposed:
+    external: true

@@ -1,0 +1,46 @@
+version: '3.9'
+name: distribution-registry
+# Distribution Registry stack
+
+# Distribution Registry
+#
+# Page: https://distribution.github.io/distribution
+# Code: https://github.com/distribution/distribution
+# Dckr: https://hub.docker.com/_/registry
+# Cmps: https://distribution.github.io/distribution#deploy-your-registry-using-a-compose-file
+#
+# Open Source Registry implementation for storing and distributing container
+# images and other content using the OCI Distribution Specification. The goal
+# of this project is to provide a simple, secure, and scalable base for building
+# a large scale registry solution or running a simple private registry. It is a
+# core library for many registry operators including Docker Hub, GitHub
+# Container Registry, GitLab Container Registry and DigitalOcean Container
+# Registry, as well as the CNCF Harbor Project, and VMware Harbor Registry.
+
+services:
+
+  registry:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: registry:${ACTUAL_VERSION:-2}
+    restart: unless-stopped
+    volumes:
+    - /etc/${COMPOSE_PROJECT_NAME}:/etc/docker/registry
+    - /srv/${COMPOSE_PROJECT_NAME}/data:/var/lib/registry
+    - /srv/${COMPOSE_PROJECT_NAME}/auth:/auth
+    networks:
+      - proxy
+      - exposed
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=5000"
+
+networks:
+  proxy:
+    external: true
+  exposed:
+    external: true

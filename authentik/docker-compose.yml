@@ -1,0 +1,130 @@
+version: '3.9'
+name: authentik
+# authentik stack
+
+# authentik
+#
+# Page: https://goauthentik.io/
+# Code: https://github.com/goauthentik/authentik
+# Dckr: https://github.com/goauthentik/authentik/pkgs/container/server
+# Cmps: https://goauthentik.io/docs/installation/docker-compose
+#
+# authentik is an open-source Identity Provider, focused on flexibility and
+# versatility. With authentik, site administrators, application developers, and
+# security engineers have a dependable and secure solution for authentication in
+# almost any type of environment. There are robust recovery actions available
+# for the users and applications, including user profile and password
+# management. You can quickly edit, deactivate, or even impersonate a user
+# profile, and set a new password for new users or reset an existing password.
+
+services:
+
+  postgresql:
+    container_name: ${COMPOSE_PROJECT_NAME}-postgresql
+    image: docker.io/library/postgres:${AUTHENTIK_POSTGRES_TAG:-12-alpine}
+    restart: unless-stopped
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 5s
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/database:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: ${PG_PASS:?database password required}
+      POSTGRES_USER: ${PG_USER:-authentik}
+      POSTGRES_DB: ${PG_DB:-authentik}
+    env_file:
+      - stack.env
+
+  redis:
+    container_name: ${COMPOSE_PROJECT_NAME}-redis
+    image: docker.io/library/redis:${AUTHENTIK_REDIS_TAG:-alpine}
+    command: --save 60 1 --loglevel warning
+    restart: unless-stopped
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 3s
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/redis:/data
+
+  server:
+    container_name: ${COMPOSE_PROJECT_NAME}-server
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-latest}
+    restart: unless-stopped
+    networks:
+      - default
+      - proxy
+      - smtp
+    command: server
+    environment:
+      AUTHENTIK_REDIS__HOST: redis
+      AUTHENTIK_POSTGRESQL__HOST: postgresql
+      AUTHENTIK_POSTGRESQL__USER: ${PG_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/media:/media
+      - /srv/${COMPOSE_PROJECT_NAME}/custom-templates:/templates
+    env_file:
+      - stack.env
+    depends_on:
+      - postgresql
+      - redis
+    labels:
+      - "traefik.enable=true"
+      # Base domain
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-base.rule=Host(`auth.${COMPOSE_DOMAIN:?Compose FQDN missing}`, `${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-base.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-base.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-base.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-base.entrypoints=http,https"
+      # Additional domain
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-additional.rule=Host(${ADDITIONAL_DOMAINS:?Additional FQDN list missing})"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-additional.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-additional.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-additional.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-additional.entrypoints=http,https"
+      # Service
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=9000"
+
+  worker:
+    container_name: ${COMPOSE_PROJECT_NAME}-worker
+    image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-latest}
+    restart: unless-stopped
+    networks:
+      - default
+      - smtp
+    command: worker
+    environment:
+      AUTHENTIK_REDIS__HOST: redis
+      AUTHENTIK_POSTGRESQL__HOST: postgresql
+      AUTHENTIK_POSTGRESQL__USER: ${PG_USER:-authentik}
+      AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
+    user: root
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /srv/${COMPOSE_PROJECT_NAME}/media:/media
+      - /srv/${COMPOSE_PROJECT_NAME}/certs:/certs
+      - /srv/${COMPOSE_PROJECT_NAME}/custom-templates:/templates
+    env_file:
+      - stack.env
+    depends_on:
+      - postgresql
+      - redis
+
+networks:
+  default:
+  smtp:
+    external: true
+  proxy:
+    external: true

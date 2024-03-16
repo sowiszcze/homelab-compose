@@ -1,0 +1,43 @@
+version: '3.9'
+name: docker-mailserver
+# Docker Mailserver stack
+
+# Docker Mailserver
+#
+# Page: https://docker-mailserver.github.io/docker-mailserver/latest/
+# Repo: https://github.com/docker-mailserver/docker-mailserver
+# Dckr: https://github.com/docker-mailserver/docker-mailserver/pkgs/container/docker-mailserver
+# Cmps: https://github.com/docker-mailserver/docker-mailserver/blob/master/compose.yaml
+#
+# Production-ready fullstack but simple mail server (SMTP, IMAP, LDAP, Antispam,
+# Antivirus, etc.) running inside a container.
+
+services:
+
+  docker-mailserver:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    hostname: mail.${COMPOSE_DOMAIN}
+    image: ghcr.io/docker-mailserver/docker-mailserver:${POSTAL_TAG:-latest}
+    restart: unless-stopped
+    stop_grace_period: 1m
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/data:/var/mail
+      - /srv/${COMPOSE_PROJECT_NAME}/state:/var/mail-state
+      - /var/log/${COMPOSE_PROJECT_NAME}:/var/log/mail
+      - /etc/${COMPOSE_PROJECT_NAME}:/tmp/docker-mailserver
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    networks:
+      - smtp
+      - exposed
+    env_file: stack.env
+    healthcheck:
+      test: "ss --listening --tcp | grep -P 'LISTEN.+:smtp' || exit 1"
+      timeout: 3s
+      retries: 0
+
+networks:
+  smtp:
+    external: true
+  exposed:
+    external: true

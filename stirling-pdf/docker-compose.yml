@@ -1,0 +1,49 @@
+version: '3.9'
+name: stirling-pdf
+# Stirling PDF stack
+
+# Stirling PDF
+#
+# Page: N/A
+# Code: https://github.com/Stirling-Tools/stirling-pdf
+# Dckr: https://hub.docker.com/r/frooodle/s-pdf
+# Cmps: https://github.com/Stirling-Tools/stirling-pdf#docker--podman
+#
+# This is a powerful locally hosted web based PDF manipulation tool using docker
+# that allows you to perform various operations on PDF files, such as splitting
+# merging, converting, reorganizing, adding images, rotating, compressing, and
+# more. This locally hosted web application started as a 100% ChatGPT-made
+# application and has evolved to include a wide range of features to handle all
+# your PDF needs.
+
+services:
+
+  stirling-pdf:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    hostname: ${COMPOSE_PROJECT_NAME}
+    image: frooodle/s-pdf:${STIRLING_TAG:-latest}
+    environment:
+      - DOCKER_ENABLE_SECURITY
+    networks:
+      - exposed
+      - proxy
+    volumes:
+      - /etc/${COMPOSE_PROJECT_NAME}:/configs/
+      - /srv/${COMPOSE_PROJECT_NAME}:/customFiles/
+      - /usr/share/tesseract-ocr/5/tessdata:/usr/share/tesseract-ocr/5/tessdata/
+      - /var/log/${COMPOSE_PROJECT_NAME}:/logs/
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${NETWORK_DOMAIN:?Netowrk domain is not defined}`) || Host(`stirlingpdf.${NETWORK_DOMAIN}`) || Host(`pdf.${NETWORK_DOMAIN}`) || Host(`${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine domain is not defined}`) || Host(`stirlingpdf.${MACHINE_DOMAIN}`) || Host(`pdf.${MACHINE_DOMAIN}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8080"
+
+networks:
+  proxy:
+    external: true
+  exposed:
+    external: true

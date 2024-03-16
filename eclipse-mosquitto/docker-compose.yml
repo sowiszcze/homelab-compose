@@ -1,0 +1,115 @@
+version: '3.9'
+name: mosquitto
+# Eclipse Mosquitto™ stack
+
+# Eclipse Mosquitto™
+#
+# Page: https://mosquitto.org/
+# Repo: https://github.com/eclipse/mosquitto
+# Dckr: https://hub.docker.com/_/eclipse-mosquitto
+# Cmps: https://github.com/eclipse/mosquitto/tree/master/docker/generic
+#
+# Eclipse Mosquitto is an open source (EPL/EDL licensed) message broker that
+# implements the MQTT protocol versions 5.0, 3.1.1 and 3.1. Mosquitto is
+# lightweight and is suitable for use on all devices from low power single
+# board computers to full servers.
+
+# Mosquitto Exporter
+#
+# Page: N/A
+# Repo: https://github.com/sapcc/mosquitto-exporter
+# Dckr: https://hub.docker.com/r/sapcc/mosquitto-exporter
+# Cmps: N/A
+#
+# Prometheus exporter for the Mosquitto MQTT message broker.
+
+# MQTT Blackbox Exporter
+#
+# Page: N/A
+# Repo: https://github.com/inovex/mqtt_blackbox_exporter
+# Dckr: https://hub.docker.com/r/inovex/mqtt_blackbox_exporter
+# Cmps: N/A
+#
+# Tests MQTT messaging roundtrips (publish/subscribe on same topic).
+
+services:
+
+  mosquitto:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: eclipse-mosquitto:${MOSQUITTO_TAG:-latest}
+    volumes:
+      - /etc/${COMPOSE_PROJECT_NAME}:/mosquitto/config
+      - /srv/${COMPOSE_PROJECT_NAME}:/mosquitto/data
+      - /var/log/${COMPOSE_PROJECT_NAME}:/mosquitto/log
+    networks:
+      default:
+      proxy:
+      mqtt:
+        aliases:
+          - mqtt
+          - ${COMPOSE_PROJECT_NAME}
+    healthcheck:
+      test: "(ps -o comm | grep -q -m 1 mosquitto) || exit 1"
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}.entrypoints=${COMPOSE_PROJECT_NAME}"
+      - "traefik.tcp.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=1883"
+      - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}-ws.rule=HostSNI(`${COMPOSE_PROJECT_NAME}.${NETWORK_DOMAIN:?Netowrk domain is not defined}`) || HostSNI(`mqtt.${NETWORK_DOMAIN}`) || HostSNI(`${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine domain is not defined}`) || HostSNI(`mqtt.${MACHINE_DOMAIN}`)"
+      - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}-ws.tls=true"
+      - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}-ws.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}-ws.service=${COMPOSE_PROJECT_NAME}-ws"
+      - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}-ws.entrypoints=${COMPOSE_PROJECT_NAME}-ws"
+      - "traefik.tcp.services.${COMPOSE_PROJECT_NAME}-ws.loadbalancer.server.port=8883"
+
+  exporter:
+    container_name: mosquitto-exporter
+    image: sapcc/mosquitto-exporter:${MOSQUITTO_EXPORTER_TAG:-latest}
+    networks:
+      - default
+      - monitoring
+      - proxy
+    environment:
+      - MQTT_USER=${MOSQUITTO_EXPORTER_USER}
+      - MQTT_PASS=${MOSQUITTO_EXPORTER_PASS}
+      - BROKER_ENDPOINT=${MOSQUITTO_ENDPOINT:-tcp://mosquitto:1883}
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mosquitto-exporter.rule=Host(`mosquitto-exporter.${NETWORK_DOMAIN}`) || Host(`mosquitto-exporter.${MACHINE_DOMAIN}`)"
+      - "traefik.http.routers.mosquitto-exporter.tls=true"
+      - "traefik.http.routers.mosquitto-exporter.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.mosquitto-exporter.service=mosquitto-exporter"
+      - "traefik.http.routers.mosquitto-exporter.entrypoints=http,https"
+      - "traefik.http.services.mosquitto-exporter.loadbalancer.server.port=9234"
+
+  blackbox-exporter:
+    container_name: mqtt-blackbox-exporter
+    image: inovex/mqtt_blackbox_exporter:${MQTT_BLACKBOX_EXPORTER_TAG:-v0.7.0}
+    command: -config.file /data/config.yaml
+    networks:
+      - default
+      - monitoring
+      - proxy
+    volumes:
+      - /srv/mqtt-blackbox-exporter:/data
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mqtt-blackbox-exporter.rule=Host(`mqtt-blackbox-exporter.${NETWORK_DOMAIN}`) || Host(`mqtt-blackbox-exporter.${MACHINE_DOMAIN}`)"
+      - "traefik.http.routers.mqtt-blackbox-exporter.tls=true"
+      - "traefik.http.routers.mqtt-blackbox-exporter.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.mqtt-blackbox-exporter.service=mqtt-blackbox-exporter"
+      - "traefik.http.routers.mqtt-blackbox-exporter.entrypoints=http,https"
+      - "traefik.http.services.mqtt-blackbox-exporter.loadbalancer.server.port=9214"
+
+networks:
+  default:
+  monitoring:
+    external: true
+  proxy:
+    external: true
+  mqtt:
+    external: true

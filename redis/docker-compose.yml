@@ -1,0 +1,73 @@
+version: '3.9'
+name: redis
+# Redis stack
+
+# Redis
+#
+# Page: https://redis.io/
+# Repo: https://github.com/redis/redis
+# Dckr: https://hub.docker.com/_/redis
+# Cmps: N/A
+#
+# Redis is an open-source, networked, in-memory, key-value data store with
+# optional durability. It is written in ANSI C. The development of Redis is
+# sponsored by Redis Labs today; before that, it was sponsored by Pivotal and
+# VMware. According to the monthly ranking by DB-Engines.com, Redis is the most
+# popular key-value store. The name Redis means REmote DIctionary Server.
+
+# RedisInsight - Developer GUI for Redis, by Redis
+#
+# Page: https://joeferner.github.io/redis-commander/
+# Repo: https://github.com/joeferner/redis-commander
+# Dckr: https://github.com/joeferner/redis-commander/pkgs/container/redis-commander
+# Cmps: https://github.com/joeferner/redis-commander#with-docker-compose
+#
+# A node.js web application used to view, edit, and manage a Redis Database
+
+services:
+
+  redis:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: redis:${REDIS_TAG:-7-alpine}
+    command: redis-server /etc/redis/redis.conf
+    healthcheck:
+      test: "(ps -o comm | grep -q -m 1 redis-server) || exit 1"
+    networks:
+      - default
+      - proxy
+    volumes:
+      - /etc/${COMPOSE_PROJECT_NAME}:/etc/redis
+      - /srv/${COMPOSE_PROJECT_NAME}:/data
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}.entrypoints=${COMPOSE_PROJECT_NAME}"
+      - "traefik.tcp.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=6379"
+
+  redis-commander:
+    container_name: ${COMPOSE_PROJECT_NAME}-commander
+    image: ghcr.io/joeferner/redis-commander:${REDIS_COMMANDER_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      - app
+    volumes:
+      - /etc/${COMPOSE_PROJECT_NAME}-commander:/redis-commander/config
+      - /var/run/${COMPOSE_PROJECT_NAME}:/var/run/redis:ro
+    networks:
+      - default
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${NETWORK_DOMAIN:?Netowrk domain is not defined}`) || Host(`${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine domain is not defined}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8081"
+
+networks:
+  default:
+  proxy:
+    external: true

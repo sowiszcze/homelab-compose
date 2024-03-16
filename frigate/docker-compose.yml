@@ -1,0 +1,83 @@
+version: '3.9'
+name: frigate
+# Frigate stack
+
+# Frigate
+#
+# Page: https://frigate.video/
+# Repo: https://github.com/blakeblackshear/frigate
+# Dckr: https://github.com/blakeblackshear/frigate/pkgs/container/frigate
+# Cmps: https://docs.frigate.video/frigate/installation#docker
+#
+# A complete and local NVR designed for Home Assistant with AI object detection.
+# Uses OpenCV and Tensorflow to perform realtime object detection locally for IP
+# cameras.
+
+services:
+
+  frigate:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    hostname: ${COMPOSE_PROJECT_NAME}
+    privileged: true
+    image: ghcr.io/blakeblackshear/frigate:${FRIGATE_TAG:-stable}
+    restart: unless-stopped
+    shm_size: ${FRIGATE_SHM_SIZE:-64mb} # https://docs.frigate.video/frigate/installation#calculating-required-shm-size
+    cap_add:
+      - CAP_PERFMON
+    devices:
+      - /dev/apex_0:/dev/apex_0 # Passes a PCIe Coral, follow driver instructions here https://coral.ai/docs/m2/get-started/#2a-on-linux
+      - /dev/dri/renderD128:/dev/dri/renderD128 # For intel hwaccel
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/${COMPOSE_PROJECT_NAME}:/config
+      - /cabinet/${COMPOSE_PROJECT_NAME}:/media/frigate
+      - type: tmpfs # Optional: 1GB of memory, reduces SSD/SD Card wear
+        target: /tmp/cache
+        tmpfs:
+          size: 1000000000
+    environment:
+      - FRIGATE_RTSP_PASSWORD
+    networks:
+      - exposed
+      - proxy
+      - smarthome
+    ports:
+      - 5000:5000
+    labels:
+      - "traefik.enable=true"
+
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${NETWORK_DOMAIN:?Netowrk domain is not defined}`) || Host(`${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine domain is not defined}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=5000"
+
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-api.rule=Host(`${COMPOSE_PROJECT_NAME}-api.${NETWORK_DOMAIN}`) || Host(`${COMPOSE_PROJECT_NAME}-api.${MACHINE_DOMAIN}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-api.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-api.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-api.service=${COMPOSE_PROJECT_NAME}-api"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-api.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}-api.loadbalancer.server.port=1984"
+
+      - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}-rtsp.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}-rtsp.service=${COMPOSE_PROJECT_NAME}-rtsp"
+      - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}-rtsp.entrypoints=rtsp"
+      - "traefik.tcp.services.${COMPOSE_PROJECT_NAME}-rtsp.loadbalancer.server.port=8554"
+
+      - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}-webrtc-over-tcp.rule=HostSNI(`*`)"
+      - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}-webrtc-over-tcp.service=${COMPOSE_PROJECT_NAME}-webrtc-over-tcp"
+      - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}-webrtc-over-tcp.entrypoints=webrtc-over-tcp"
+      - "traefik.tcp.services.${COMPOSE_PROJECT_NAME}-webrtc-over-tcp.loadbalancer.server.port=8555"
+
+      - "traefik.udp.routers.${COMPOSE_PROJECT_NAME}-webrtc-over-udp.service=${COMPOSE_PROJECT_NAME}-webrtc-over-udp"
+      - "traefik.udp.routers.${COMPOSE_PROJECT_NAME}-webrtc-over-udp.entrypoints=webrtc-over-udp"
+      - "traefik.udp.services.${COMPOSE_PROJECT_NAME}-webrtc-over-udp.loadbalancer.server.port=8555"
+
+networks:
+  exposed:
+    external: true
+  proxy:
+    external: true
+  smarthome:
+    external: true
