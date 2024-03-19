@@ -2,10 +2,13 @@ version: '3.9'
 name: <STACK_NAME>
 # $APP_NAME stack
 
+# $APP_NAME
+#
 # Page: $APP_HOME_URL
+# Repo: $APP_REPO_URL
 # Dckr: $APP_SPEC_URL
-# Code: $APP_REPO_URL
-
+# Cmps: $APP_SPEC_URL
+#
 # $APP_DESCRIPTION
 
 services:
