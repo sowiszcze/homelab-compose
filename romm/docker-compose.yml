@@ -1,0 +1,74 @@
+version: '3.9'
+name: romm
+# romm stack
+
+# ROM Manager
+#
+# Page: https://romm.website/
+# Repo: https://github.com/zurdi15/romm
+# Dckr: https://github.com/users/zurdi15/packages/container/package/romm
+# Cmps: https://github.com/zurdi15/romm/blob/release/examples/docker-compose.example.yml
+#
+# RomM (ROM Manager) allows you to scan, enrich, and browse your game collection
+# with a clean and responsive interface. With support for multiple platforms,
+# various naming schemes and custom tags, RomM is a must-have for anyone who
+# plays on emulators.
+
+services:
+
+  romm-db:
+    image: mariadb:${ROMM_MARIADB_TAG:-latest}
+    container_name: romm-db
+    restart: unless-stopped
+    volumes:
+      - /srv/romm/mysql:/var/lib/mysql
+    networks:
+      - default
+    environment:
+      - MYSQL_ROOT_PASSWORD # Use a unique, secure password
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-romm}
+      - MYSQL_USER=${MYSQL_USER:-romm-user}
+      - MYSQL_PASSWORD
+
+  romm:
+    container_name: romm
+    image: zurdi15/romm:${ROMM_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      - DB_HOST=romm-db
+      - DB_NAME=${MYSQL_DATABASE:-romm}
+      - DB_USER=${MYSQL_USER:-romm-user}
+      - DB_PASSWD=${MYSQL_PASSWORD:?Database password is missing}
+      - IGDB_CLIENT_ID # Generate an ID and SECRET in IGDB
+      - IGDB_CLIENT_SECRET # https://api-docs.igdb.com/#account-creation
+      - ROMM_AUTH_SECRET_KEY # Generate a key with `openssl rand -hex 32`
+      - ROMM_AUTH_USERNAME=${ROMM_AUTH_USERNAME:-admin}
+      - ROMM_AUTH_PASSWORD # default: admin
+    depends_on:
+      - romm-db
+    volumes:
+      - /srv/romm/resources:/romm/resources # Resources fetched from IGDB (covers, screenshots, etc.)
+      - /srv/romm/redis:/redis-data # Cached data for background tasks
+      - /srv/romm/library:/romm/library # Your game library
+      - /srv/romm/assets:/romm/assets # Uploaded saves, states, etc.
+      - /etc/romm/config:/romm/config # [Optional] Path where config.yml is stored
+      - /var/log/romm:/romm/logs # [Optional] Path where logs are stored
+    networks:
+      - default
+      - exposed
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8080"
+
+networks:
+  default:
+  exposed:
+    external: true
+  proxy:
+    external: true
