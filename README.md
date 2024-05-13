@@ -18,24 +18,26 @@ though, so people can have some idea how those can be deployed.
 > Not sorted in any way.
 
 - [ ] Add new and already deployed stacks
-- [ ] Environment variables how-to
-- [ ] Requirements and installation how-to
+- [ ] Update all stacks to newest version
+- [x] Environment variables how-to
+- [x] Requirements and installation how-to
 - [ ] Reusable parts
-- [ ] Migrate project description and metadata to separate `README.md` files
+- [ ] Migrate projects description and metadata to separate `README.md` files
 - [ ] Readme files generator based on config files
 - [ ] Deployment environment agnostic projects
 - [ ] Enable configuration of traefik router rules
 - [ ] Enable more fine-grained configuration of used volumes
 
-## Compose project status explanation
+## Setup and prerequisites
 
-| Emoji | Status name | Description |
-| ----- | ----------- | ----------- |
-|   ✔️   | Working     | Proven working in live environment, was or even still is in active use |
-|   🏗️   | Draft      | Project is being actively worked on (untested, unreleased or broken by updates) |
-|   🗄️   | Archived   | Project was once deployed and working, but since then its updates were abandoned, or it never reached maturity |
+Before using this repository's Docker Compose projects please first make sure
+you have prepared the target machine with required
+[environment variables](ENVIRONMENT.md) and went through the
+[setup process](SETUP.md).
 
 ## Compose projects statuses
+
+### Projects list
 
 | Project name | Last updated[^1] |
 | ----- | ----- |
@@ -88,6 +90,14 @@ though, so people can have some idea how those can be deployed.
 | ✔️ wallabag | 2024-04-29 22:05:08 |
 | ✔️ web-check | 2024-03-19 22:59:34 |
 | ✔️ zigbee2mqtt | 2024-02-09 21:17:49 |
+
+### Status icons explanation
+
+| Emoji | Status name | Description |
+| ----- | ----------- | ----------- |
+|   ✔️   | Working     | Proven working in live environment, was or even still is in active use |
+|   🏗️   | Draft      | Project is being actively worked on (untested, unreleased or broken by updates) |
+|   🗄️   | Archived   | Project was once deployed and working, but since then its updates were abandoned, or it never reached maturity |
 
 ## Copyrights
 
