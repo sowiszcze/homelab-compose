@@ -17,9 +17,12 @@ though, so people can have some idea how those can be deployed.
 > [!NOTE]
 > Not sorted in any way.
 
+- [ ] Add new and already deployed stacks
 - [ ] Environment variables how-to
+- [ ] Requirements and installation how-to
 - [ ] Reusable parts
 - [ ] Migrate project description and metadata to separate `README.md` files
+- [ ] Readme files generator based on config files
 - [ ] Deployment environment agnostic projects
 - [ ] Enable configuration of traefik router rules
 - [ ] Enable more fine-grained configuration of used volumes
