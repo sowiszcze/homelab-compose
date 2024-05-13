@@ -1,16 +1,4 @@
-version: '3.9'
 name: anonaddy
-# AnonAddy stack
-
-# AnonAddy
-#
-# Page: https://anonaddy.com/
-# Repo: https://github.com/anonaddy
-# Dckr: https://hub.docker.com/r/anonaddy/anonaddy
-# Cmps: https://github.com/anonaddy/docker/blob/master/examples/traefik/compose.yml
-#
-# Anonymous Email Forwarding
-# Protect your real email address using email aliases
 
 services:
 
@@ -45,10 +33,10 @@ services:
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8000"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-rspamd.rule=Host(`${COMPOSE_PROJECT_NAME}-rspamd.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-rspamd.middlewares=authentik@file"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-rspamd.rule=Host(`${COMPOSE_PROJECT_NAME}-rspamd.${COMPOSE_DOMAIN}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-rspamd.middlewares=${AUTH_MIDDLEWARE:?Auth middleware is not defined}"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-rspamd.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-rspamd.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-rspamd.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-rspamd.service=${COMPOSE_PROJECT_NAME}-rspamd"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-rspamd.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}-rspamd.loadbalancer.server.port=11334"
@@ -65,7 +53,7 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-nginx.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`,${MTA_STS_DOMAINS:-mta-sts.${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}}) && PathPrefix(`/.well-known`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-nginx.rule=(Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}`) || Host(`${MTA_STS_DOMAINS:-mta-sts.${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}}`)) && PathPrefix(`/.well-known`)"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-nginx.tls=true"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-nginx.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-nginx.service=${COMPOSE_PROJECT_NAME}-nginx"
