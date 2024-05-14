@@ -1,0 +1,77 @@
+name: headscale
+
+services:
+
+  headscale:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: headscale/headscale:${HEADSCALE_TAG:-0.22}
+    volumes:
+      - /etc/${COMPOSE_PROJECT_NAME}:/etc/headscale
+      - /srv/${COMPOSE_PROJECT_NAME}:/srv/headscale
+    restart: unless-stopped
+    command: headscale serve --force
+    networks:
+      - default
+      - exposed
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-grpc.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}`, `${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN}`) && PathPrefix(`/grpc`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-grpc.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-grpc.tls.certresolver=${CERT_RESOLVER}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-grpc.service=${COMPOSE_PROJECT_NAME}-grpc"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-grpc.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}-grpc.loadbalancer.server.port=58080"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-api.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Netowrk domain is not defined}`, `${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine domain is not defined}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-api.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-api.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-api.service=${COMPOSE_PROJECT_NAME}-api"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-api.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}-api.loadbalancer.server.port=8080"
+
+  headscale-ui:
+    container_name: ${COMPOSE_PROJECT_NAME}-ui
+    image: ghcr.io/gurucomputing/headscale-ui:${HEADSCALE_UI_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      - headscale
+    networks:
+      - default
+      - exposed
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-ui.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}`, `${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN}`) && PathPrefix(`/web`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-ui.middlewares=${AUTH_MIDDLEWARE:?Auth middleware is not defined}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-ui.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-ui.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-ui.service=${COMPOSE_PROJECT_NAME}-ui"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-ui.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}-ui.loadbalancer.server.port=80"
+
+  headscale-admin:
+    container_name: ${COMPOSE_PROJECT_NAME}-admin
+    image: goodieshq/headscale-admin:${HEADSCALE_ADMIN_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      - headscale
+    networks:
+      - default
+      - exposed
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-admin.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}`, `${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN}`) && PathPrefix(`/admin`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-admin.middlewares=${AUTH_MIDDLEWARE:?Auth middleware is not defined}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-admin.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-admin.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-admin.service=${COMPOSE_PROJECT_NAME}-admin"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-admin.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}-admin.loadbalancer.server.port=80"
+
+networks:
+  default:
+  exposed:
+    external: true
+  proxy:
+    external: true

@@ -1,0 +1,14 @@
+name: netalertx
+
+services:
+  netalertx:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: jokobsk/netalertx:${NETALERTX_TAG:-latest}
+    volumes:
+      - /etc/${COMPOSE_PROJECT_NAME}:/app/config
+      - /srv/${COMPOSE_PROJECT_NAME}/db:/app/db
+      - /var/log/${COMPOSE_PROJECT_NAME}:/app/front/log
+    restart: unless-stopped
+    environment:
+      - TZ
+    network_mode: host

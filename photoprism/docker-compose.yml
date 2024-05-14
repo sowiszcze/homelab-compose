@@ -1,0 +1,60 @@
+name: photoprism
+
+services:
+
+  photoprism:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: photoprism/photoprism:${PHOTOPRISM_TAG:-latest}
+    restart: unless-stopped
+    stop_grace_period: 10s
+    depends_on:
+      - photoprism-db
+    group_add:
+      - "${RENDER_GROUP:?Host render group ID missing}"
+    security_opt:
+      - seccomp:unconfined
+      - apparmor:unconfined
+    devices:
+      - /dev/dri/renderD128:/dev/dri/renderD128
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/storage:/photoprism/storage
+      - /stockpile/photos:/photoprism/originals
+    working_dir: /photoprism
+    env_file:
+      - stack.env
+    networks:
+      - default
+      - exposed
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${PHOTOPRISM_DOMAIN:-${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine FQDN missing}}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=2342"
+
+  photoprism-db:
+    container_name: ${COMPOSE_PROJECT_NAME}-db
+    image: mariadb:${PHOTOPRISM_MARIA_TAG:-11}
+    restart: unless-stopped
+    stop_grace_period: 5s
+    security_opt:
+      - seccomp:unconfined
+      - apparmor:unconfined
+    command: --innodb-buffer-pool-size=512M --transaction-isolation=READ-COMMITTED --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --max-connections=512 --innodb-rollback-on-timeout=OFF --innodb-lock-wait-timeout=120
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/db:/var/lib/mysql
+    env_file:
+      - stack.env
+    networks:
+      - default
+
+networks:
+  default:
+    internal: true
+  exposed:
+    external: true
+  proxy:
+    external: true

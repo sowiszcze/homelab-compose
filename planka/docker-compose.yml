@@ -1,0 +1,75 @@
+name: planka
+
+services:
+  plank:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: ghcr.io/plankanban/planka:${PLANKA_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      planka-db:
+        condition: service_healthy
+    networks:
+      - default
+      - proxy
+      - smtp
+      - exposed
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/user-avatars:/app/public/user-avatars
+      - /srv/${COMPOSE_PROJECT_NAME}/project-background-images:/app/public/project-background-images
+      - /srv/${COMPOSE_PROJECT_NAME}/attachments:/app/private/attachments
+    environment:
+      - BASE_URL=https://${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}
+      - DATABASE_URL=postgresql://postgres@${COMPOSE_PROJECT_NAME}-db/${COMPOSE_PROJECT_NAME}
+      - SECRET_KEY=${PLANKA_KEY:?Secret key not set}
+      - TRUST_PROXY=1
+      - OIDC_ISSUER=${PLANKA_OIDC_ISSUER:?OIDC issuer not set}
+      - OIDC_CLIENT_ID=${PLANKA_OIDC_CLIENT:?OIDC client ID not set}
+      - OIDC_CLIENT_SECRET=${PLANKA_OIDC_SECRET:?OIDC client secret not set}
+      - OIDC_SCOPES=${PLANKA_OIDC_SCOPES:-openid email profile}
+      - OIDC_ADMIN_ROLES=${PLANKA_OIDC_ADMIN_ROLES:-admin}
+      - OIDC_EMAIL_ATTRIBUTE=${PLANKA_OIDC_EMAIL:-email}
+      - OIDC_NAME_ATTRIBUTE=${PLANKA_OIDC_NAME:-name}
+      - OIDC_USERNAME_ATTRIBUTE=${OIDC_PLANKA_USERNAME:-preferred_username}
+      - OIDC_ROLES_ATTRIBUTE=${PLANKA_OIDC_ROLES:-groups}
+      - OIDC_ENFORCED=true
+      - SMTP_HOST=docker-mailserver
+      - SMTP_PORT=${PLANKA_SMTP_PORT:-587}
+      - SMTP_SECURE=${PLANKA_SMTP_SECURE:-true}
+      - SMTP_USER
+      - SMTP_PASSWORD
+      - SMTP_FROM
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER?Certificate resolver is not defined}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=1337"
+
+  planka-db:
+    image: postgres:${PLANKA_DB_TAG:-14-alpine}
+    container_name: ${COMPOSE_PROJECT_NAME}-db
+    restart: unless-stopped
+    networks:
+      - default
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=${COMPOSE_PROJECT_NAME}
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ${COMPOSE_PROJECT_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  default:
+    internal: true
+  proxy:
+    external: true
+  smtp:
+    external: true
+  exposed:
+    external: true

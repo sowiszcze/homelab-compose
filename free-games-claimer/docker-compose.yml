@@ -1,0 +1,30 @@
+name: free-games-claimer
+
+services:
+
+  free-games-claimer:
+    image: ghcr.io/vogler/free-games-claimer:${FGC_TAG:-latest}
+    container_name: ${COMPOSE_PROJECT_NAME}
+    command: >-
+      bash -c "node prime-gaming; node gog; echo sleeping; sleep 1d"
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}:/fgc/data
+    restart: unless-stopped
+    env_file: stack.env
+    networks:
+      - proxy
+      - exposed
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=6080"
+
+networks:
+  proxy:
+    external: true
+  exposed:
+    external: true

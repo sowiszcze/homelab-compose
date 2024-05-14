@@ -1,0 +1,40 @@
+version: '3.9'
+name: stalwart-smtp
+# Stalwart stack
+
+# Page: https://stalw.art/
+# Dckr: https://stalw.art/docs/install/docker/
+# Code: https://github.com/stalwartlabs/mail-server
+
+# Self-hosting your mail server has been notoriously difficult.
+# Not anymore! Stalwart is a scalable, secure and robust
+# open-source mail server software designed for the 21st century.
+
+services:
+  app:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: stalwartlabs/smtp-server:${STALWART_SMTP_TAG:-latest}
+    restart: unless-stopped
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}:/opt/stalwart-mail
+      - /etc/letsencrypt:/etc/letsencrypt
+    networks:
+      - smtp
+      - proxy
+      - exposed
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=4190"
+
+networks:
+  proxy:
+    external: true
+  exposed:
+    external: true
+  smtp:
+    external: true

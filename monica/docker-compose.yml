@@ -1,0 +1,84 @@
+name: monica
+
+services:
+
+  monica:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: monica:${MONICA_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      - monica-db
+      - monica-kv
+    environment:
+      APP_ENV: production
+      APP_KEY: ${MONICA_KEY:?Application key is missing}
+      DB_CONNECTION: mysql
+      DB_HOST: ${COMPOSE_PROJECT_NAME}-db
+      DB_PORT: 3306
+      DB_DATABASE: ${MONICA_DB_NAME:-monica}
+      DB_USERNAME: ${MONICA_DB_USER:-monica}
+      DB_PASSWORD: ${MONICA_DB_PASS}
+      MAIL_MAILER: smtp
+      MAIL_HOST: mail.${COMPOSE_DOMAIN}
+      MAIL_PORT: 25
+      MAIL_ENCRYPTION: false
+      MAIL_FROM_ADDRESS: ${COMPOSE_PROJECT_NAME}@mail.${COMPOSE_DOMAIN}
+      MAIL_FROM_NAME: "Monica"
+      APP_DISABLE_SIGNUP: true
+      APP_TRUSTED_PROXIES: "*"
+      CHECK_VERSION: false
+      CACHE_DRIVER: redis
+      SESSION_DRIVER: redis
+      REDIS_HOST: ${COMPOSE_PROJECT_NAME}-kv
+      FILESYSTEM_DISK: s3
+      AWS_KEY: ${MONICA_S3_KEY:?S3 storage key not present}
+      AWS_SECRET: ${MONICA_S3_SECRET:?S3 storage secret not present}
+      AWS_REGION: none
+      AWS_BUCKET: ${MONICA_S3_BUCKET:-COMPOSE_PROJECT_NAME}
+      AWS_SERVER: ${MONICA_S3_SERVER:-minio}
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/data:/var/www/html/storage
+    networks:
+      - default
+      - exposed
+      - proxy
+      - smtp
+      - s3
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${SUBDOMAIN:-$COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=${AUTH_MIDDLEWARE:?Auth middleware is not defined}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=80"
+
+  monica-db:
+    container_name: ${COMPOSE_PROJECT_NAME}-db
+    image: mariadb:${MONICA_MARIADB_TAG:-11}
+    environment:
+      MYSQL_RANDOM_ROOT_PASSWORD: true
+      MYSQL_DATABASE: ${MONICA_DB_NAME:-monica}
+      MYSQL_USER: ${MONICA_DB_USER:-monica}
+      MYSQL_PASSWORD: ${MONICA_DB_PASS:?Database password is missing}
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/db:/var/lib/mysql
+    restart: unless-stopped
+    networks:
+      - default
+
+  monica-kv:
+    container_name: ${COMPOSE_PROJECT_NAME}-kv
+    image: registry.redict.io/redict:${MONICA_KV_TAG:-latest}
+    restart: unless-stopped
+
+networks:
+  default:
+    internal: true
+  exposed:
+    external: true
+  proxy:
+    external: true
+  smtp:
+    external: true
+  s3:
+    external: true

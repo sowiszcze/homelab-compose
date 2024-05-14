@@ -1,0 +1,13 @@
+name: music-assistant
+
+services:
+
+  music-assistant:
+    image: ghcr.io/music-assistant/server:${MASS_TAG:-latest}
+    container_name: ${COMPOSE_PROJECT_NAME}
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}:/data
+      - /stockpile/music:/music
+    restart: unless-stopped
+    network_mode: host
+    privileged: true

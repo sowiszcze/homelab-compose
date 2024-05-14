@@ -1,0 +1,37 @@
+version: '3.9'
+name: maddy
+# Maddy Mail Server stack
+
+# Page: https://maddy.email/
+# Dckr: https://maddy.email/docker/
+# Code: https://github.com/foxcpp/maddy
+
+# Implements all functionality required to run a e-mail
+# server. It can send messages via SMTP (works as MTA),
+# accept messages via SMTP (works as MX) and store messages
+# while providing access to them via IMAP. In addition to
+# that it implements auxiliary protocols that are mandatory
+# to keep email reasonably secure (DKIM, SPF, DMARC, DANE,
+# MTA-STS).
+
+services:
+  app:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: foxcpp/maddy:${STALWART_SMTP_TAG:-latest}
+    restart: unless-stopped
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}:/data
+      - /etc/letsencrypt:/etc/letsencrypt
+      - /srv/${COMPOSE_PROJECT_NAME}/app/dkim:/dkim
+    environment:
+      - MADDY_HOSTNAME=${MADDY_DOMAIN}
+      - MADDY_DOMAIN=${MADDY_DOMAIN}
+    networks:
+      - smtp
+      - exposed
+
+networks:
+  exposed:
+    external: true
+  smtp:
+    external: true

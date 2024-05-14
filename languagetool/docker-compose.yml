@@ -1,0 +1,27 @@
+name: languagetool
+
+services:
+
+  languagetool:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: silviof/docker-languagetool:${LANGUAGETOOL_TAG:-latest}
+    restart: unless-stopped
+    volumes:
+      - /var/ngrams:/ngrams:ro
+    networks:
+      - exposed
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${SUBDOMAIN:-$COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`) && PathPrefix(`/${LT_PATH_PREFIX}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=${COMPOSE_PROJECT_NAME}-stripprefix"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8010"
+      - "traefik.http.middlewares.${COMPOSE_PROJECT_NAME}-stripprefix.stripprefix.prefixes=/${LT_PATH_PREFIX:?Path prefix for LanguageTool is missing}"
+
+networks:
+  exposed:
+    external: true
+  proxy:
+    external: true

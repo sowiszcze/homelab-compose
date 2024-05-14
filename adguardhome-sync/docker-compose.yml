@@ -1,0 +1,95 @@
+name: adguardhome
+
+services:
+
+  dhcprelay:
+    image: modem7/dhcprelay:${DHCPRELAY_TAG:-latest}
+    container_name: dhcprelay
+    command: ["-d", "-i", "eno1", "-i", "br_adguard", "${PRIMARY_DNS:?Primary DNS IP has to be defined}"]
+    cap_add:
+      - NET_ADMIN
+    network_mode: host
+    restart: always
+    depends_on:
+      - adguardhome
+    mem_limit: 32m
+    mem_reservation: 8m
+
+  adguardhome-sync:
+    image: ghcr.io/bakito/adguardhome-sync:${AG_SYNC_TAG:-latest}
+    container_name: ${COMPOSE_PROJECT_NAME}-sync
+    command: run --config /config.yaml
+    volumes:
+      - /etc/${COMPOSE_PROJECT_NAME}-sync/config.yaml:/config.yaml
+    restart: always
+    networks:
+      - default
+      - proxy
+      - exposed
+    labels:
+      - "traefik.enable=true"
+      # Admin panel
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-sync.rule=Host(`${COMPOSE_PROJECT_NAME}-sync.${COMPOSE_DOMAIN}`, `${COMPOSE_PROJECT_NAME}-sync.${MACHINE_DOMAIN}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-sync.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-sync.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-sync.service=${COMPOSE_PROJECT_NAME}-sync"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-sync.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}-sync.loadbalancer.server.port=8080"
+
+  adguardhome:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    hostname: ${COMPOSE_PROJECT_NAME}
+    image: adguard/adguardhome:${ADGUARDHOME_TAG:-latest}
+    volumes:
+      - /etc/${COMPOSE_PROJECT_NAME}:/opt/adguardhome/conf
+      - /srv/${COMPOSE_PROJECT_NAME}:/opt/adguardhome/work
+      - ${LETSENCRYPT_DIR:-/etc/letsencrypt}:/etc/letsencrypt:ro
+    ports:
+      - "${ADGUARDHOME_PORT:-3000}:3000/tcp" # Web UI
+      - "${EXTERNAL_IP:?External IP has to be set}:53:53/tcp"
+      - "${EXTERNAL_IP}:53:53/udp"
+      - "${TAILSCALE_IP:?IP in the Tailscale network has to be set}:53:53/tcp"
+      - "${TAILSCALE_IP}:53:53/udp"
+    restart: always
+    privileged: true
+    networks:
+      default:
+        ipv4_address: ${PRIMARY_DNS}
+      proxy:
+      exposed:
+    dns:
+      - 127.0.0.1
+      - ${FALLBACK_DNS:?Fallback DNS has to be defined}
+      - 1.1.1.1
+      - 1.0.0.1
+      - 9.9.9.9
+    labels:
+      - "traefik.enable=true"
+      # Admin panel
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose domain is not defined}`, `${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine domain is not defined}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=3000"
+      # DNS-over-HTTPS
+      - "traefik.http.routers.dns-over-https.rule=Headers(`accept`, `application/dns-json`) || Host(`dns.${COMPOSE_DOMAIN}`, `dns.${MACHINE_DOMAIN}`)"
+      - "traefik.http.routers.dns-over-https.tls=true"
+      - "traefik.http.routers.dns-over-https.tls.certresolver=${CERT_RESOLVER}"
+      - "traefik.http.routers.dns-over-https.service=dns-over-https"
+      - "traefik.http.routers.dns-over-https.entrypoints=http,https"
+      - "traefik.http.services.dns-over-https.loadbalancer.server.port=443"
+      - "traefik.http.services.dns-over-https.loadbalancer.server.scheme=https"
+
+networks:
+  default:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: br_adguard
+    ipam:
+      config:
+        - subnet: ${PRIMARY_DNS_SUBNET:?Subnet for primary DNS has to be defined}
+  proxy:
+    external: true
+  exposed:
+    external: true

@@ -1,0 +1,69 @@
+name: wekan
+
+services:
+  wekan:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: ghcr.io/wekan/wekan:${LEANTIME_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      - wekan-db
+    networks:
+      - default
+      - proxy
+      - smtp
+      - exposed
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}:/data
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      WRITABLE_PATH: /data
+      MONGO_URL: mongodb://${COMPOSE_PROJECT_NAME}-db:27017/${COMPOSE_PROJECT_NAME}
+      ROOT_URL: https://${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}
+      MAIL_URL: smtp://docker-mailserver:25/?ignoreTLS=true&tls={rejectUnauthorized:false}
+      MAIL_FROM: Wekan Notifications <wekan@mail.${COMPOSE_DOMAIN}>
+      WITH_API: true
+      PASSWORD_LOGIN_ENABLED: false
+      OIDC_REDIRECTION_ENABLED: true
+      OAUTH2_ENABLED: true
+      OAUTH2_LOGIN_STYLE: redirect
+      OAUTH2_CLIENT_ID: ${WEKAN_OIDC_CLIENT:?OIDC Client ID is missing}
+      OAUTH2_SERVER_URL: https://auth.${COMPOSE_DOMAIN:?Compose FQDN missing}
+      OAUTH2_AUTH_ENDPOINT: /application/o/authorize/
+      OAUTH2_USERINFO_ENDPOINT: /application/o/userinfo/
+      OAUTH2_TOKEN_ENDPOINT: /application/o/token/
+      OAUTH2_SECRET: ${WEKAN_OIDC_SECRET:?OIDC Secret is missing}
+      OAUTH2_REQUEST_PERMISSIONS: openid profile email
+      OAUTH2_ID_MAP: email
+      OAUTH2_USERNAME_MAP: preferred_username
+      OAUTH2_FULLNAME_MAP: name
+      OAUTH2_EMAIL_MAP: email
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER?Certificate resolver is not defined}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8080"
+
+  wekan-db:
+    image: mongo:${WEKAN_DB_TAG:-6}
+    container_name: ${COMPOSE_PROJECT_NAME}-db
+    command: mongod --logpath /dev/null --oplogSize 128 --quiet
+    restart: unless-stopped
+    networks:
+      - default
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /srv/${COMPOSE_PROJECT_NAME}/db:/data/db
+      - /srv/${COMPOSE_PROJECT_NAME}/db-dump:/dump
+
+networks:
+  default:
+    internal: true
+  proxy:
+    external: true
+  smtp:
+    external: true
+  exposed:
+    external: true

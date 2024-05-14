@@ -1,0 +1,13 @@
+name: glances
+
+services:
+
+  glances:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: nicolargo/glances:${GLANCES_TAG:-latest}
+    restart: unless-stopped
+    pid: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - "GLANCES_OPT=-w"

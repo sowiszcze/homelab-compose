@@ -1,0 +1,50 @@
+name: wikijs
+
+services:
+
+  wikijs:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: ghcr.io/requarks/wiki:${WIKIJS_TAG:-2}
+    volumes:
+      - /etc/${COMPOSE_PROJECT_NAME}/config.yml:/wiki/config.yml
+      - /srv/${COMPOSE_PROJECT_NAME}:/data
+    restart: unless-stopped
+    depends_on:
+      - wikijs-db
+    networks:
+      - default
+      - exposed
+      - proxy
+      - elasticsearch
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Netowrk domain is not defined}`) || Host(`${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine domain is not defined}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=cors-allow-all@file,security-headers@file"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=3000"
+
+  wikijs-db:
+    container_name: ${COMPOSE_PROJECT_NAME}-db
+    image: postgres:${WIKIJS_POSTGRES_TAG:-15-alpine}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${WIKIJS_DB_NAME:-wikijs}
+      POSTGRES_PASSWORD: ${WIKIJS_DB_PASS:?Database password not set}
+      POSTGRES_USER: ${WIKIJS_DB_USER:-wikijs}
+    networks:
+      - default
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/db:/var/lib/postgresql/data
+
+networks:
+  default:
+    internal: true
+  exposed:
+    external: true
+  proxy:
+    external: true
+  elasticsearch:
+    external: true

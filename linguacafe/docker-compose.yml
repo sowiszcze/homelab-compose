@@ -1,0 +1,67 @@
+version: '3.9'
+name: linguacafe
+
+services:
+
+  linguacafe:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: ghcr.io/simjanos-dev/linguacafe-webserver:${LINGUACAFE_VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      DB_DATABASE: ${DB_DATABASE:-linguacafe}
+      DB_USERNAME: ${DB_USERNAME:-linguacafe}
+      DB_PASSWORD: ${DB_PASSWORD:-linguacafe}
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/storage:/var/www/html/storage
+    networks:
+      - default
+      - proxy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - mysql
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Certificate resolver not defined}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=80"
+
+  mysql:
+    image: mysql:${LINGUACAFE_MYSQL_TAG:-8.0}
+    container_name: ${COMPOSE_PROJECT_NAME}-database
+    restart: unless-stopped
+    tty: true
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/database:/var/lib/mysql
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-linguacafe}
+      MYSQL_USER: ${DB_USERNAME:-linguacafe}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-linguacafe}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-linguacafe}
+      SERVICE_NAME: ${COMPOSE_PROJECT_NAME}
+    command: mysqld --general-log=1 --general-log-file=/var/lib/mysql/general-log.log
+    networks:
+      - default
+
+  python:
+    container_name: ${COMPOSE_PROJECT_NAME}-python-service
+    command: "python3 /app/tokenizer.py"
+    restart: unless-stopped
+    tty: true
+    image: ghcr.io/simjanos-dev/linguacafe-python-service:${LINGUACAFE_PYTHON_TAG:-latest}
+    environment:
+      PYTHONPATH: "/var/www/html/storage/app/model"
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/storage:/var/www/html/storage
+    networks:
+      - default
+    platform: ${PLATFORM:-}
+
+networks:
+  default:
+    internal: true
+  proxy:
+    external: true

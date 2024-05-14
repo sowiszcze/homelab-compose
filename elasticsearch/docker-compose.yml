@@ -1,0 +1,28 @@
+name: elasticsearch
+
+services:
+
+  wikijs:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: docker.elastic.co/elasticsearch/elasticsearch:${ELASTICSEARCH_TAG:-7.17.2}
+    user: "${ES_UID:-1000}:${ES_GID:-1000}"
+    volumes:
+      - /etc/${COMPOSE_PROJECT_NAME}:/usr/share/elasticsearch/config
+      - /srv/${COMPOSE_PROJECT_NAME}/data:/usr/share/elasticsearch/data
+      - /var/log/${COMPOSE_PROJECT_NAME}:/usr/share/elasticsearch/logs
+    restart: unless-stopped
+    environment:
+      - "discovery.type=${ES_DISCOVERY_TYPE:-single-node}"
+      - "node.name=${COMPOSE_PROJECT_NAME}"
+      - "bootstrap.memory_lock=true"
+      - "ES_JAVA_OPTS=${ES_JAVA_ARGS:--Xms512m -Xmx512m}"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    networks:
+      - elasticsearch
+
+networks:
+  elasticsearch:
+    external: true

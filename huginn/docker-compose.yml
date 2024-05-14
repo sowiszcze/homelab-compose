@@ -1,0 +1,35 @@
+name: huginn
+
+services:
+
+  huginn:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: huginn/huginn:${HUGINN_TAG:-latest}
+    restart: unless-stopped
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/db:/var/lib/mysql
+    environment:
+      RAILS_ENV: production
+      SMTP_SERVER: mail.${COMPOSE_DOMAIN}
+      SMTP_PORT: 25
+      EMAIL_FROM_ADDRESS: ${COMPOSE_PROJECT_NAME}@mail.${COMPOSE_DOMAIN}
+    networks:
+      - exposed
+      - proxy
+      - smtp
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}`, `${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=3000"
+
+networks:
+  exposed:
+    external: true
+  proxy:
+    external: true
+  smtp:
+    external: true

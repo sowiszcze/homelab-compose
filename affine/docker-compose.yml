@@ -1,0 +1,86 @@
+name: affine
+
+services:
+
+  affine:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: ghcr.io/toeverything/affine-graphql:${AFFINE_TAG:-stable}
+    command: ['sh', '-c', 'node ./scripts/self-host-predeploy && node ./dist/index.js']
+    volumes:
+      - /etc/${COMPOSE_PROJECT_NAME}:/root/.affine/config
+      - /srv/${COMPOSE_PROJECT_NAME}/data:/root/.affine/storage
+    restart: unless-stopped
+    environment:
+      - NODE_OPTIONS="--import=./scripts/register.js"
+      - AFFINE_CONFIG_PATH=/root/.affine/config
+      - REDIS_SERVER_HOST=${COMPOSE_PROJECT_NAME}-kv
+      - DATABASE_URL=postgres://${AFFINE_DB_USER:-affine}:${AFFINE_DB_PASS}@affine-db:5432/${AFFINE_DB_NAME:-affine}
+      - NODE_ENV=production
+      - AFFINE_ADMIN_EMAIL=${AFFINE_ADM_MAIL:?Admin email missing}
+      - AFFINE_ADMIN_PASSWORD=${AFFINE_ADM_PASS?:Admin password missing}
+      - MAILER_HOST=mail.${COMPOSE_DOMAIN}
+      - MAILER_PORT=${AFFINE_MAIL_PORT:-25}
+      - MAILER_USER=${AFFINE_MAIL_USER}
+      - MAILER_PASSWORD=${AFFINE_MAIL_PASS}
+      - MAILER_SENDER=${AFFINE_MAIL_NAME}
+    depends_on:
+      affine-db:
+        condition: service_healthy
+      affine-kv:
+        condition: service_healthy
+    networks:
+      - default
+      - exposed
+      - proxy
+      - smtp
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Netowrk domain is not defined}`) || Host(`${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine domain is not defined}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=3010"
+
+  affine-db:
+    container_name: ${COMPOSE_PROJECT_NAME}-db
+    image: postgres:${AFFINE_POSTGRES_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: "${AFFINE_DB_USER:-affine}"
+      POSTGRES_PASSWORD: "${AFFINE_DB_PASS:?Password for Postgres database is missing}"
+      POSTGRES_DB: "${AFFINE_DB_NAME:-affine}"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    networks:
+      - default
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-d", "${COMPOSE_PROJECT_NAME}", "-U", "${AFFINE_DB_USER:-affine}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  affine-kv:
+    container_name: ${COMPOSE_PROJECT_NAME}-kv
+    image: registry.redict.io/redict:${AFFINE_REDICT_TAG:-latest}
+    restart: unless-stopped
+    networks:
+      - default
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/kv:/data
+    healthcheck:
+      test: ["CMD", "redict-cli", '--raw', 'incr', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  default:
+    internal: true
+  exposed:
+    external: true
+  proxy:
+    external: true
+  smtp:
+    external: true

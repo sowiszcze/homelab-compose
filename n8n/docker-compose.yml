@@ -1,0 +1,35 @@
+name: n8n
+
+services:
+
+  n8n:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: docker.n8n.io/n8nio/n8n:${N8N_TAG:-latest}
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/data:/home/node/.n8n
+      - /srv/${COMPOSE_PROJECT_NAME}/files:/files
+    restart: unless-stopped
+    environment:
+      - N8N_HOST=${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - NODE_ENV=production
+      - WEBHOOK_URL=https://${COMPOSE_PROJECT_NAME}.${DOMAIN_NAME}/
+      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
+    networks:
+      - exposed
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}`, `${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=5678"
+
+networks:
+  exposed:
+    external: true
+  proxy:
+    external: true

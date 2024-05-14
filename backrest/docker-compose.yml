@@ -1,0 +1,51 @@
+version: '3.9'
+name: backrest
+# backrest stack
+
+# Page: N/A
+# Dckr: https://github.com/garethgeorge/backrest#running-with-docker-compose
+# Code: https://github.com/garethgeorge/backrest
+
+# A web-accessible backup solution built on top of restic. Backrest
+# provides a WebUI which wraps the restic CLI and makes it easy to
+# create repos, browse snapshots, and restore files. Additionally,
+# Backrest can run in the background and take an opinionated approach
+# to scheduling snapshots and orchestrating repo health operations.
+
+services:
+  app:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: garethgeorge/backrest:${BACKREST_VERSION:-latest}
+    restart: unless-stopped
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}:/data
+      - /etc/${COMPOSE_PROJECT_NAME}:/config
+      - /tmp/${COMPOSE_PROJECT_NAME}:/cache
+      - /backup:/repos
+      - /etc:/userdata/etc:ro
+      - /home:/userdata/home:ro
+      - /opt:/userdata/opt:ro
+      - /srv:/userdata/srv:ro
+      - /var:/userdata/var:ro
+    environment:
+      - BACKREST_DATA
+      - BACKREST_CONFIG
+      - XDG_CACHE_HOME
+    hostname: ${COMPOSE_PROJECT_NAME}
+    networks:
+      - exposed
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=9898"
+
+networks:
+  exposed:
+    external: true
+  proxy:
+    external: true

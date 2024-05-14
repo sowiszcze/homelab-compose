@@ -1,0 +1,64 @@
+name: linkstack
+
+services:
+
+  linkstack:
+    hostname: ${COMPOSE_PROJECT_NAME}
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: linkstackorg/linkstack:${LINKSTACK_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      - TZ
+      - SERVER_ADMIN=${LINKSTACK_ADMIN:?Admin account needs to be defined}
+      - HTTP_SERVER_NAME=${LINKSTACK_DOMAIN:-${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}}
+      - HTTPS_SERVER_NAME=${LINKSTACK_DOMAIN:-${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}}
+      - LOG_LEVEL=${LINKSTACK_LOGLEVEL:-info}
+      - PHP_MEMORY_LIMIT=${LINKSTACK_MEMLIMIT:-256M}
+      - UPLOAD_MAX_FILESIZE=${LINKSTACK_UPLOADMAX:-8M}
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/data:/htdocs
+    depends_on:
+      - linkstack-db
+    networks:
+      - default
+      - proxy
+      - exposed
+      - smtp
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=${LINKSTACK_DOMAIN:+Host(`}${LINKSTACK_DOMAIN}${LINKSTACK_DOMAIN:+`) || }Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Certificate resolver not defined}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=443"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.scheme=https"
+
+  linkstack-db:
+    container_name: ${COMPOSE_PROJECT_NAME}-db
+    image: mariadb:${LINKSTACK_DB_TAG:-11}
+    restart: unless-stopped
+    environment:
+      - MARIADB_ROOT_PASSWORD=${LINKSTACK_DB_ROOT_PASS:?Password for database root user has to be set}
+      - MARIADB_MYSQL_LOCALHOST_USER=${LINKSTACK_DB_LOCAL_USER:-1}
+      - MARIADB_DATABASE=${LINKSTACK_DB_NAME:-linkstack}
+      - MARIADB_USER=${LINKSTACK_DB_USER:-linkstack}
+      - MARIADB_PASSWORD=${LINKSTACK_DB_PASS:?Database password has to be set}
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/db:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthcheck.sh", "--su=mysql", "--connect", "--innodb_initialized"]
+      interval: 20s
+      timeout: 3s
+    networks:
+      - default
+
+networks:
+  default:
+    internal: true
+  proxy:
+    external: true
+  exposed:
+    external: true
+  smtp:
+    external: true
