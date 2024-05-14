@@ -2,10 +2,17 @@ name: actual
 
 services:
 
-  actualbudget:
+  actual:
     container_name: ${COMPOSE_PROJECT_NAME}
-    image: docker.io/actualbudget/actual-server:${ACTUAL_TAG:-latest}
+    image: actualbudget/actual-server:${ACTUAL_TAG:-latest}
     restart: unless-stopped
+    healthcheck:
+      test: 'cat /proc/net/tcp6 /proc/net/tcp | grep -iEsqe "^[ \0A-F]+: 0+:`printf \"%x\" 5006` [\0A-F:]+ 0A "'
+      interval: 10s
+      timeout: 1s
+      retries: 3
+      start_period: 30s
+      start_interval: 2s
     volumes:
       - /srv/${COMPOSE_PROJECT_NAME}:/data
     networks:
