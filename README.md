@@ -44,7 +44,7 @@ you have prepared the target machine with required
 | ----- | ----- |
 | ✔️ actual | 2024-05-14 18:53:59 |
 | ✔️ adguardhome | 2024-05-14 19:24:06 |
-| ✔️ anonaddy | 2024-05-05 16:28:54 |
+| ✔️ anonaddy | 2024-05-14 19:47:46 |
 | ✔️ archivebox | 2024-02-22 20:01:14 |
 | ✔️ aria2 | 2024-04-03 18:16:34 |
 | ✔️ arr | 2024-04-04 00:05:08 |
