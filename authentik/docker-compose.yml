@@ -60,8 +60,10 @@ services:
     env_file:
       - stack.env
     depends_on:
-      - authentik-db
-      - authentik-kv
+      authentik-db:
+        condition: service_healthy
+      authentik-kv:
+        condition: service_healthy
     labels:
       - "traefik.enable=true"
       # Base domain
@@ -104,8 +106,10 @@ services:
     env_file:
       - stack.env
     depends_on:
-      - authentik-db
-      - authentik-kv
+      authentik-db:
+        condition: service_healthy
+      authentik-kv:
+        condition: service_healthy
 
 networks:
   default:
