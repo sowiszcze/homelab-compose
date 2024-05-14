@@ -10,8 +10,16 @@ services:
       - NET_ADMIN
     network_mode: host
     restart: always
+    healthcheck:
+      test: 'netstat -lun | grep -iqEe "^udp\s+\0+\s+\0+\s+[:\.\0A-F]+:53\s+" || exit 1'
+      interval: 10s
+      timeout: 1s
+      retries: 3
+      start_period: 30s
+      start_interval: 2s
     depends_on:
-      - adguardhome
+      adguardhome:
+        condition: service_healthy
     mem_limit: 32m
     mem_reservation: 8m
 
@@ -26,6 +34,13 @@ services:
     ports:
       - ${ADGUARDHOME_PORT:-3000}:3000/tcp # Web UI
     restart: always
+    healthcheck:
+      test: 'wget -q --spider --proxy=off localhost:3000 2>/dev/null || exit 1'
+      interval: 10s
+      timeout: 1s
+      retries: 3
+      start_period: 30s
+      start_interval: 2s
     privileged: true
     networks:
       default:

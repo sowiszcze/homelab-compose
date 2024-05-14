@@ -21,6 +21,7 @@ though, so people can have some idea how those can be deployed.
 - [ ] Update all stacks to newest version
 - [x] Environment variables how-to
 - [x] Requirements and installation how-to
+- [ ] Add healthcheck where possible and it makes sense
 - [ ] Reusable parts
 - [ ] Migrate projects description and metadata to separate `README.md` files
 - [ ] Readme files generator based on config files
@@ -42,7 +43,7 @@ you have prepared the target machine with required
 | Project name | Last updated[^1] |
 | ----- | ----- |
 | ✔️ actual | 2024-05-14 18:53:59 |
-| ✔️ adguardhome | 2024-05-02 20:59:07 |
+| ✔️ adguardhome | 2024-05-14 19:24:06 |
 | ✔️ anonaddy | 2024-05-05 16:28:54 |
 | ✔️ archivebox | 2024-02-22 20:01:14 |
 | ✔️ aria2 | 2024-04-03 18:16:34 |
