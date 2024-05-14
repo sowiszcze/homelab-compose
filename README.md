@@ -47,7 +47,7 @@ you have prepared the target machine with required
 | ✔️ archivebox | 2024-02-22 20:01:14 |
 | ✔️ aria2 | 2024-04-03 18:16:34 |
 | ✔️ arr | 2024-04-04 00:05:08 |
-| ✔️ authentik | 2024-04-12 18:39:11 |
+| ✔️ authentik | 2024-05-14 13:39:08 |
 | ✔️ diun | 2024-03-12 10:39:05 |
 | ✔️ docker-mailserver | 2024-03-22 12:39:23 |
 | 🗄️ dockge | 2024-03-01 16:26:25 |
