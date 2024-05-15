@@ -1,0 +1,39 @@
+name: Actual Budget stack
+status: working
+updated: "2024-05-14 18:53:59"
+containers:
+  - name: Actual Budget
+    title: Budget manager
+    icon: actual.png
+    color: "8444e9"
+    webpage: https://actualbudget.org/
+    repository: https://github.com/actualbudget/actual
+    docker_image: https://hub.docker.com/r/actualbudget/actual-server
+    compose_example: https://hub.docker.com/r/actualbudget/actual-server
+    description: >-
+      A super fast and privacy-focused app for managing your finances. At its
+      heart is the well proven and much loved Envelope Budgeting methodology.
+      You own your data and can do whatever you want with it. Featuring
+      multi-device sync, optional end-to-end encryption and so much more.
+    variables:
+    tags:
+      - accounting
+      - accounts
+      - balance
+      - banking
+      - budgeting
+      - cash
+      - envelope
+      - expenses
+      - finances
+      - flow
+      - management
+      - money
+      - personal
+      - reports
+      - saving
+      - spending
+      - transactions
+      - transfers
+      - worth
+      - zero-based

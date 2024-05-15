@@ -1,0 +1,3 @@
+{{define "working"}}✔️{{end}}
+{{define "draft"}}🏗️{{end}}
+{{define "obsolete"}}🗄️{{end}}
