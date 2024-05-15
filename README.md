@@ -151,7 +151,7 @@ you have prepared the target machine with required
 | ----- | ----------- | ----------- |
 |   ✔️   | Working     | Proven working in live environment, was or even still is in active use |
 |   🏗️   | Draft      | Project is being actively worked on (untested, unreleased or broken by updates) |
-|   🗄️   | Archived   | Project was once deployed and working, but since then its updates were abandoned, or it never reached maturity |
+|   🗄️   | Obsolete   | Project was once deployed and working, but since then its updates were abandoned, or it never reached maturity |
 
 ## Copyrights
 
