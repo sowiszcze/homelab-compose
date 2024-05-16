@@ -1,3 +1,52 @@
-{{define "working"}}✔️{{end}}
-{{define "draft"}}🏗️{{end}}
-{{define "obsolete"}}🗄️{{end}}
+# {{ .Name }}
+
+Last updated: {{ .LastUpdated }}
+
+Status: {{ .Status | ToEmoji }} {{ .Status | ToTitle }}
+
+## Project dedicated environment variables[^1]
+{{if .Variables}}
+| Name | Default value | Valid example | Description |
+| ---- | ------------- | ------------- | ----------- |
+{{range .Variables -}}
+| {{ .Name | AsCode }} | {{ .Default | AsCode }} | {{ .Example | AsCode }} | {{ .Description }} |
+{{end}}{{else}}
+No dedicated environment variables available.
+{{end}}
+## Notable services
+{{range .Containers}}
+### {{if .Icon}}<img alt="" src="{{ .Icon }}" height="32px"> {{end}}{{ .Name }}
+
+Category: {{ .Category }}
+
+{{ .Description }}
+
+#### Links for {{ .Name }}
+{{range .Links}}
+* [{{ .Name }}]({{ .Url }})
+{{- end}}
+
+#### {{ .Name }} dedicated environment variables[^1]
+{{if .Variables}}
+| Name | Default value | Valid example | Description |
+| ---- | ------------- | ------------- | ----------- |
+{{range .Variables -}}
+| {{ .Name | AsCode }} | {{ .Default | AsCode }} | {{ .Example | AsCode }} | {{ .Description }} |
+{{end}}{{else}}
+No dedicated environment variables available.
+{{end}}{{if .ServesHttp}}
+#### Example [dashy `section.item` entry](https://dashy.to/docs/configuring/#sectionitem) for {{ .Name }}
+
+```yaml
+- title: {{ .Name }}
+  description: {{ .Category }}
+  icon: >-
+    https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/{{ .Slug }}.png
+  url: https://{{ .Slug }}.example.com/{{if .Tags}}
+  tags:{{range .Tags}}
+    - {{ . }}
+    {{- end}}{{end}}{{if .Color}}
+  color: '{{ .Color }}'{{end}}
+```
+{{end}}{{end}}
+{{if .Containers}}[^1]: Besides and/or instead of those available thanks to used image.{{else}}No declared services.{{end}}

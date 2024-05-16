@@ -1,0 +1,57 @@
+name: Affine stack
+status: obsolete
+updated: "2024-04-13 19:40:57"
+variables:
+  - name: AFFINE_DB_PASS
+    example: long_and_unguessable_password
+    description: Password for the database
+  - name: AFFINE_ADM_MAIL
+    example: mail@example.com
+    description: Email address for the admin account
+  - name: AFFINE_ADM_PASS
+    example: long_and_unguessable_password
+    description: Password for the admin account
+  - name: AFFINE_MAIL_NAME
+    example: '"AFFiNE <affine@example.com>"'
+    description: Value in the emails' `from` field
+containers:
+  - name: Affine
+    slug: affine
+    category: Knowledge-base
+    icon: affine.png
+    serves_http: yes
+    links:
+      - name: Webpage
+        url: https://affine.pro/
+      - name: Documentation
+        url: https://docs.affine.pro/docs/
+      - name: Repository
+        url: https://github.com/toeverything/AFFiNE
+      - name: GitHub Container Registry
+        url: ghcr.io/toeverything/affine-graphql
+      - name: "`docker-compose.yml` example"
+        url: https://raw.githubusercontent.com/toeverything/AFFiNE/stable/.github/deployment/self-host/compose.yaml
+    description: >-
+      There can be more than Notion and Miro. AFFiNE(pronounced [ə‘fain]) is a
+      next-gen knowledge base that brings planning, sorting and creating all
+      together. Privacy first, open-source, customizable and ready to use.
+    color: "#1E96EB"
+    tags:
+      - electron
+      - editor
+      - markdown
+      - rust
+      - app
+      - wiki
+      - notes
+      - table
+      - rust-language
+      - workspace
+      - whiteboard
+      - tableview
+      - rust-lang
+      - crdt
+      - knowledge-base
+      - notion
+      - miro
+      - notion-alternative

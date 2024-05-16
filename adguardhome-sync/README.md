@@ -1,6 +1,6 @@
-# AdGuard Home stack
+# AdGuard Home Sync stack
 
-Last updated: 2024-05-14 19:24:06
+Last updated: 2024-05-03 10:38:19
 
 Status: :heavy_check_mark: Working
 
@@ -56,6 +56,33 @@ No dedicated environment variables available.
   icon: >-
     https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/adguard-home.png
   url: https://adguard-home.example.com/
+  color: '#68BC71'
+```
+
+### <img alt="" src="adguardhome-sync.png" height="32px"> AdGuardHome Sync
+
+Category: Networking
+
+Synchronize AdGuardHome config to replica instances.
+
+#### Links for AdGuardHome Sync
+
+* [Repository](https://github.com/bakito/adguardhome-sync)
+* [GitHub Container Registry](https://ghcr.io/bakito/adguardhome-sync)
+* [`docker-compose.yml` example](https://github.com/bakito/adguardhome-sync#docker-compose)
+
+#### AdGuardHome Sync dedicated environment variables[^1]
+
+No dedicated environment variables available.
+
+#### Example [dashy `section.item` entry](https://dashy.to/docs/configuring/#sectionitem) for AdGuardHome Sync
+
+```yaml
+- title: AdGuardHome Sync
+  description: Networking
+  icon: >-
+    https://cdn.jsdelivr.net/gh/walkxcode/dashboard-icons/png/adguardhome-sync.png
+  url: https://adguardhome-sync.example.com/
   color: '#68BC71'
 ```
 

@@ -3,19 +3,25 @@ status: working
 updated: "2024-05-14 18:53:59"
 containers:
   - name: Actual Budget
-    title: Budget manager
+    slug: actual
+    category: Budget manager
     icon: actual.png
-    color: "8444e9"
-    webpage: https://actualbudget.org/
-    repository: https://github.com/actualbudget/actual
-    docker_image: https://hub.docker.com/r/actualbudget/actual-server
-    compose_example: https://hub.docker.com/r/actualbudget/actual-server
+    serves_http: yes
+    links:
+      - name: Webpage
+        url: https://actualbudget.org/
+      - name: Repository
+        url: https://github.com/actualbudget/actual
+      - name: Docker Hub
+        url: https://hub.docker.com/r/actualbudget/actual-server
+      - name: "`docker-compose.yml` example"
+        url: https://hub.docker.com/r/actualbudget/actual-server
     description: >-
       A super fast and privacy-focused app for managing your finances. At its
       heart is the well proven and much loved Envelope Budgeting methodology.
       You own your data and can do whatever you want with it. Featuring
       multi-device sync, optional end-to-end encryption and so much more.
-    variables:
+    color: "#8444e9"
     tags:
       - accounting
       - accounts

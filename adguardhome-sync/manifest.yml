@@ -1,0 +1,69 @@
+name: AdGuard Home Sync stack
+status: working
+updated: "2024-05-03 10:38:19"
+variables:
+  - name: FALLBACK_DNS
+    example: "9.9.9.9"
+    description: DNS IP used as a fallback in case the main one fails to start
+  - name: PRIMARY_DNS
+    example: "10.0.0.10"
+    description: >-
+      Primary DNS IP, equals to IP address of AdGuard Home service in
+      `br_adguard` network
+  - name: PRIMARY_DNS_SUBNET
+    example: "10.0.0.0/24"
+    description: CIDR notation for subnet mask of `br_adguard` network
+containers:
+  - name: ISC DHCP Relay Agent
+    category: Networking
+    serves_http: no
+    links:
+      - name: Webpage
+        url: https://linux.die.net/man/8/dhcrelay
+      - name: Repository
+        url: https://github.com/modem7/DHCP-Relay
+      - name: Docker Hub
+        url: https://hub.docker.com/r/modem7/dhcprelay
+      - name: "`docker-compose.yml` example"
+        url: https://github.com/modem7/DHCP-Relay#configuration
+    description: >-
+      The Internet Systems Consortium DHCP Relay Agent, dhcrelay, provides a
+      means for relaying DHCP and BOOTP requests from a subnet to which no DHCP
+      server is directly connected to one or more DHCP servers on other subnets.
+      It supports both DHCPv4/BOOTP and DHCPv6 protocols.
+  - name: AdGuard Home
+    slug: adguard-home
+    category: Networking
+    icon: adguardhome.png
+    serves_http: yes
+    links:
+      - name: Webpage
+        url: https://adguard.com/en/adguard-home/overview.html
+      - name: Repository
+        url: https://github.com/AdguardTeam/AdGuardHome
+      - name: Docker Hub
+        url: https://hub.docker.com/r/adguard/adguardhome
+      - name: "`docker-compose.yml` example"
+        url: https://github.com/actualbudget/actual-server/blob/master/docker-compose.yml
+    description: >-
+      AdGuard Home is a network-wide software for blocking ads & tracking. After
+      you set it up, it’ll cover ALL your home devices, and you don’t need any
+      client-side software for that. With the rise of Internet-Of-Things and
+      connected devices, it becomes more and more important to be able to
+      control your whole network.
+    color: "#68BC71"
+  - name: AdGuardHome Sync
+    slug: adguardhome-sync
+    category: Networking
+    icon: adguardhome-sync.png
+    serves_http: yes
+    links:
+      - name: Repository
+        url: https://github.com/bakito/adguardhome-sync
+      - name: GitHub Container Registry
+        url: https://ghcr.io/bakito/adguardhome-sync
+      - name: "`docker-compose.yml` example"
+        url: https://github.com/bakito/adguardhome-sync#docker-compose
+    description: >-
+      Synchronize AdGuardHome config to replica instances.
+    color: "#68BC71"

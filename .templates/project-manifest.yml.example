@@ -1,0 +1,47 @@
+name: Lorem Ipsum stack
+status: working
+updated: "1970-01-01 00:00:00"
+variables:
+  - name: PROJECT_VARIABLE
+    default_value: default
+    example: consectetur
+    description: Lorem ipsum dolor sit amet
+containers:
+  - name: Service name
+    slug: service
+    category: Online service
+    icon: icon.png
+    serves_http: yes
+    links:
+      - name: Webpage
+        url: https://example.com/
+      - name: Repository
+        url: https://github.com/com/example
+      - name: Docker Hub
+        url: https://hub.docker.com/r/com/example
+      - name: "`docker-compose.yml` example"
+        url: https://hub.docker.com/r/com/example
+    description: >-
+      Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod
+      tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim
+      veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea
+      commodo consequat. Duis aute irure dolor in reprehenderit in voluptate
+      velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat
+      cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id
+      est laborum.
+    variables:
+      - name: SERVICE_VARIABLE
+        default_value: default
+        example: consectetur
+        description: Lorem ipsum dolor sit amet
+    color: "#c0ffee"
+    tags:
+      - this
+      - badboy
+      - can
+      - fit
+      - so
+      - many
+      - tags
+      - in
+      - it
