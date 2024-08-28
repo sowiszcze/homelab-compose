@@ -1,73 +1,59 @@
-version: '3.9'
 name: red-discordbot
-# Red-DiscordBot stack
 
-# Red-DiscordBot
-#
-# Page: https://docs.discord.red/
-# Code: https://github.com/Cog-Creators/Red-DiscordBot
-# Dckr: https://github.com/PhasecoreX/docker-red-discordbot
-# Cmps: https://github.com/PhasecoreX/docker-red-discordbot#docker-compose
-#
-# Red is a fully modular bot – meaning all features and commands can be
-# enabled/disabled to your liking, making it completely customizable. This is
-# a self-hosted bot – meaning you will need to host and maintain your own
-# instance. You can turn Red into an admin bot, music bot, trivia bot, new best
-# friend or all of these together!
-
-services:
-
-  red-discordbot:
-    container_name: ${COMPOSE_PROJECT_NAME}
-    image: phasecorex/red-discordbot:${RED_TAG:-full}
+x-services-fragments:
+  red-discordbot: &red-fragment
+    image: phasecorex/red-discordbot:${REDDISBOT_TAG:-core}
     depends_on:
-      - postgres
-    restart: unless-stopped
-    healthcheck:
-      test: 'xargs -0 < /proc/$$(pidof -s python)/cmdline | grep -iqE "\sredbot\s" && grep -iqE "^state:\s+[rds]" /proc/$$(pidof -s python)/status || exit 1'
+      red-discordbot-db:
+        condition: service_healthy
+        restart: true
     volumes:
       - /srv/${COMPOSE_PROJECT_NAME}/data:/data
     environment:
-      - TOKEN
-      - PREFIX
+      - TOKEN=${REDDISBOT_TOKEN:?RED Discordbot token is not defined}
+      - PREFIX=${REDDISBOT_PREFIX:-[p]}
       - TZ
-      - STORAGE_TYPE
+      - STORAGE_TYPE=${REDDISBOT_STORAGE:-postgres}
+      - PUID=${REDDISBOT_UID:-1000}
+      - PGID=${REDDISBOT_GID:-1000}
     networks:
-      - external_network
-      - internal_network
+      - default
+      - exposed
 
-  postgres:
-    container_name: ${COMPOSE_PROJECT_NAME}-postgres
-    image: postgres:${RED_POSTGRES_TAG:-15-alpine}
+x-services:
+  red-discordbot-migrate:
+    <<: *red-fragment
+    container_name: ${COMPOSE_PROJECT_NAME}-migrate
+    entrypoint: ['/bin/sh', '-c', 'sed -i "s/\"DATA_PATH\": \".*\",$$/\"DATA_PATH\": \"\/data\",/m" /data/config.json && sed -i "s/\"${REDDISBOT_SRC_INST:-red-discordbot}\":\s*{$$/\"docker\": {/m" /data/config.json && cat /data/config.json && echo "" && redbot-setup convert docker postgres']
+    restart: "no"
+    stdin_open: true
+    tty: true
+
+services:
+  red-discordbot:
+    <<: *red-fragment
+    container_name: ${COMPOSE_PROJECT_NAME}
     restart: unless-stopped
     healthcheck:
-      test: pg_isready -q || exit 1
-    volumes:
-      - /srv/${COMPOSE_PROJECT_NAME}/postgres:/var/lib/postgresql/data
-    environment:
-      - POSTGRES_PASSWORD
-      - POSTGRES_USER
-      - POSTGRES_DB
-    networks:
-      - internal_network
+      test: 'xargs -0 < /proc/$$(pidof -s python)/cmdline | grep -iqE "\sredbot\s" && grep -iqE "^state:\s+[rds]" /proc/$$(pidof -s python)/status || exit 1'
 
-  #setup:
-  #  image: phasecorex/red-discordbot:${RED_TAG:-full}
-  #  depends_on:
-  #    - postgres
-  #  entrypoint: ['/bin/sh', '-c', 'sed -i "s/\"DATA_PATH\": \".*\",$$/\"DATA_PATH\": \"\/data\",/m" /data/config.json && sed -i "s/\"${SOURCE_INSTANCE}\":\s*{$$/\"docker\": {/m" /data/config.json && cat /data/config.json && echo "" && redbot-setup convert docker postgres']
-  #  restart: "no"
-  #  stdin_open: true
-  #  tty: true
-  #  volumes:
-  #    - /srv/${COMPOSE_PROJECT_NAME}/data:/data
-  #  environment:
-  #    - TOKEN
-  #    - PREFIX
-  #    - TZ
-  #    - STORAGE_TYPE
+  red-discordbot-db:
+    container_name: ${COMPOSE_PROJECT_NAME}-db
+    image: postgres:${REDDISBOT_DB_TAG:-15-alpine}
+    restart: unless-stopped
+    healthcheck:
+      test: pg_isready -q -d $$POSTGRES_DB -U $$POSTGRES_USER || exit 1
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/db:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${REDDISBOT_DB_NAME:-red-discordbot}
+      POSTGRES_USER: ${REDDISBOT_DB_USER:-red-discordbot}
+      POSTGRES_PASSWORD: ${REDDISBOT_DB_PASS:?Database password has to be set}
+    networks:
+      - default
 
 networks:
-  external_network:
-  internal_network:
+  default:
     internal: true
+  exposed:
+    external: true

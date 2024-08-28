@@ -1,0 +1,21 @@
+name: organizr
+
+services:
+
+  organizr:
+    image: organizr/organizr:${ORGANIZR_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-hotio-arr
+    volumes:
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/config
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=80"
+
+networks:
+  exposed:
+    external: true
+  proxy:
+    external: true
+  multimedia:
+    external: true

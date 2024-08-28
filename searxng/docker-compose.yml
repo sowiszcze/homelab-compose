@@ -1,0 +1,42 @@
+name: searxng
+
+services:
+
+  searxng:
+    image: searxng/searxng:${SEARXNG_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
+    depends_on:
+      valkey:
+        condition: service_healthy
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    volumes:
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/etc/searxng:rw
+    environment:
+      SEARXNG_BASE_URL: https://${DOMAIN_OVERRIDE:-${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}}/
+      SEARXNG_REDIS_URL: redis://${COMPOSE_PROJECT_NAME}-kv:6379/0
+    networks:
+      - default
+      - exposed
+    labels:
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=${AUTH_MIDDLEWARE:?Auth middleware is not defined}"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8080"
+
+  valkey:
+    extends:
+      file: ../fragments/services.yml
+      service: valkey-persistent
+
+networks:
+  default:
+    internal: true
+  proxy:
+    external: true
+  exposed:
+    external: true

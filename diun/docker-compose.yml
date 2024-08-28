@@ -1,36 +1,27 @@
-version: '3.9'
 name: diun
-# Docker Image Update Notifier stack
-
-# Docker Image Update Notifier
-#
-# Page: https://crazymax.dev/diun/
-# Repo: https://github.com/crazy-max/diun
-# Dckr: https://hub.docker.com/r/crazymax/diun/
-# Cmps: https://crazymax.dev/diun/install/docker/#usage
-#
-# Docker Image Update Notifier is a CLI application written in Go and delivered
-# as a single executable (and a Docker image) to receive notifications when a
-# Docker image is updated on a Docker registry.
 
 services:
 
-  diun:
-    container_name: ${COMPOSE_PROJECT_NAME}
+  app:
     hostname: ${COMPOSE_PROJECT_NAME}
     image: crazymax/diun:${DIUN_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-hc
     env_file: stack.env
     networks:
       - exposed
+      - mqtt
     volumes:
-      - /etc/${COMPOSE_PROJECT_NAME}:/etc/diun
-      - /srv/${COMPOSE_PROJECT_NAME}:/data
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/etc/diun
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}:/data
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc/localtime:/etc/localtime:ro
-    restart: unless-stopped
     healthcheck:
       test: "(ps -o comm | grep -q -m 1 diun) || exit 1"
 
 networks:
   exposed:
+    external: true
+  mqtt:
     external: true

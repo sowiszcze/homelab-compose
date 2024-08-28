@@ -1,42 +1,37 @@
-version: '3.9'
 name: homebox
-# Homebox stack
-
-# Homebox
-#
-# Page: https://hay-kot.github.io/homebox/
-# Repo: https://github.com/hay-kot/homebox
-# Dckr: https://github.com/hay-kot/homebox/pkgs/container/homebox
-# Cmps: https://hay-kot.github.io/homebox/quick-start/
-#
-# Homebox is the inventory and organization system built for the Home User! With
-# a focus on simplicity and ease of use, Homebox is the perfect solution for
-# your home inventory, organization, and management needs.
 
 services:
 
   homebox:
-    container_name: ${COMPOSE_PROJECT_NAME}
-    image: ghcr.io/hay-kot/homebox:${HOMEBOX_TAG:-latest}
-    restart: unless-stopped
+    image: ghcr.io/sysadminsmedia/homebox:${HOMEBOX_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb-hc
     networks:
       - proxy
+      - exposed
       - smtp
-    env_file: stack.env
+    environment:
+      HBOX_LOG_LEVEL: ${HOMEBOX_LOG_LEVEL:-info}
+      HBOX_LOG_FORMAT: ${HOMEBOX_LOG_FORMAT:-text}
+      HBOX_WEB_MAX_UPLOAD_SIZE: ${HOMEBOX_MAX_UPLOAD:-10}
+      HBOX_OPTIONS_ALLOW_REGISTRATION: ${HOMEBOX_ALLOW_REGISTER:-false}
+      HBOX_MAILER_HOST: ${SMTP_HOST:-docker-mailserver}
+      HBOX_MAILER_PORT: ${SMTP_PORT:-25}
+      HBOX_MAILER_USERNAME: ${HOMEBOX_SMTP_USER}
+      HBOX_MAILER_PASSWORD: ${HOMEBOX_SMTP_PASS}
+      HBOX_MAILER_FROM: ${HOMEBOX_SMTP_FROM:-"Homebox <${COMPOSE_PROJECT_NAME}@${SMTP_HOST}>"}
+      HBOX_OPTIONS_CURRENCY_CONFIG: ${HOMEBOX_CUSTOM_CURRENCIES:+/data/currencies.json}
     volumes:
-      - /srv/${COMPOSE_PROJECT_NAME}:/data
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}:/data
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${SHORT_DOMAIN:?Short FQDN missing}`) || Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=${AUTHENTICATION:?No authentication middleware provided}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=${AUTH_MIDDLEWARE:?Auth middleware is not defined}"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=7745"
 
 networks:
   proxy:
+    external: true
+  exposed:
     external: true
   smtp:
     external: true

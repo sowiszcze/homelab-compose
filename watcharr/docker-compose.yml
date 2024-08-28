@@ -1,0 +1,24 @@
+name: watcharr
+
+services:
+
+  watcharr:
+    image: ghcr.io/sbondco/watcharr:${WATCHARR_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
+    volumes:
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}:/data
+    networks:
+      - exposed
+      - multimedia
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=3080"
+
+networks:
+  exposed:
+    external: true
+  proxy:
+    external: true
+  multimedia:
+    external: true

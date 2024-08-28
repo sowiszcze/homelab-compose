@@ -1,30 +1,18 @@
-version: '3.9'
 name: traefik
-# Traefik Proxy stack
-
-# Traefik Proxy
-#
-# Page: https://traefik.io/traefik/
-# Repo: https://github.com/traefik/traefik/
-# Dckr: https://hub.docker.com/_/traefik
-# Cmps: https://doc.traefik.io/traefik/getting-started/quick-start/
-#
-# Traefik is a leading modern reverse proxy and load balancer that makes
-# deploying microservices easy. Traefik integrates with your existing
-# infrastructure components and configures itself automatically and dynamically.
 
 services:
-
-  traefik:
-    container_name: ${COMPOSE_PROJECT_NAME}
+  app:
     image: traefik:${TRAEFIK_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-hc
     networks:
       - proxy
       - exposed
     healthcheck:
       test: "(ps -o comm | grep -q -m 1 traefik) || exit 1"
     extra_hosts:
-      host.docker.internal: ${TRAEFIK_DOCKER_ROUTER}
+      host.docker.internal: ${EXPOSED_BRIDGE_GATEWAY:?No proxy bridge gateway set}
     ports:
       - "80:80"         # http
       - "443:443"       # https
@@ -56,23 +44,15 @@ services:
       - "8554:8554"     # rtsp
       - "8555:8555/tcp" # webrtc-over-tcp
       - "8555:8555/udp" # webrtc-over-udp
-    environment:
-      - OVH_APPLICATION_KEY
-      - OVH_APPLICATION_SECRET
-      - OVH_CONSUMER_KEY
-      - OVH_ENDPOINT
+    env_file: stack.env
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - /etc/${COMPOSE_PROJECT_NAME}:/etc/traefik
-      - /var/log/${COMPOSE_PROJECT_NAME}:/log
-      - /etc/letsencrypt:/etc/letsencrypt
-    restart: unless-stopped
+      - ${DOCKER_SOCKET:-/var/run/docker.sock}:/var/run/docker.sock
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/etc/traefik
+      - ${PROJECT_LOGS_DIR:-${LOGS_DIR:-/var/log}/${COMPOSE_PROJECT_NAME}}:/log
+      - ${LETSENCRYPT_DIR:-/etc/letsencrypt}:/etc/letsencrypt
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine FQDN is not defined}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=${AUTH_MIDDLEWARE:?Auth middleware is not defined}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine domain is not set}`)"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=api@internal"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
 

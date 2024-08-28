@@ -3,32 +3,21 @@ name: dashy
 services:
 
   dashy:
-    container_name: ${COMPOSE_PROJECT_NAME}
     image: lissy93/dashy:${DASHY_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb-hc
     volumes:
-      - /etc/${COMPOSE_PROJECT_NAME}:/app/user-data
-    restart: unless-stopped
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/app/user-data
     environment:
       - NODE_ENV=${DASHY_ENV:-production}
       - UID=${DASHY_UID:-1000}
       - GID=${DASHY_GID:-1000}
     networks:
       - exposed
-      - proxy
     healthcheck:
       test: ['CMD', 'node', '/app/services/healthcheck']
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-      start_interval: 5s
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${NETWORK_DOMAIN:?Netowrk domain is not defined}`, `${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine domain is not defined}`, `${NETWORK_DOMAIN}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8080"
 
 networks:

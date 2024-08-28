@@ -1,38 +1,25 @@
-version: '3.9'
 name: lancommander
-# LANCommander stack
-
-# LANCommander
-#
-# Page: N/A
-# Repo: https://github.com/LANCommander/LANCommander
-# Dckr: https://hub.docker.com/r/lancommander/lancommander
-# Cmps: https://github.com/LANCommander/LANCommander#docker
-#
-# An open-source digital video game distribution system.
 
 services:
   lancommander:
     image: lancommander/lancommander:${LANCOMMANDER_TAG:-latest}
-    container_name: lancommander
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
     environment:
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
       - TZ=${TZ:-Etc/UTC}
     volumes:
-      - /etc/lancommander:/config
-    restart: unless-stopped
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/config
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}:/storage
     networks:
-      - proxy
+      - exposed
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=1337"
 
 networks:
   proxy:
+    external: true
+  exposed:
     external: true

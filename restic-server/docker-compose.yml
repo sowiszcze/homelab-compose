@@ -1,0 +1,21 @@
+name: restic-server
+
+services:
+
+  restic-server:
+    image: restic/rest-server:${RESTIC_SERVER_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
+    environment:
+      OPTIONS: "--htpasswd-file=/config/.htpasswd --path=/data --prometheus --prometheus-no-auth --private-repos"
+    volumes:
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/config
+      - /etc/localtime:/etc/localtime:ro
+      - ${RESTIC_DATA_DIR:?No data directory set}:/data
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8000"
+
+networks:
+  proxy:
+    external: true

@@ -3,7 +3,7 @@ name: sshwifty
 services:
 
   sshwifty:
-    container_name: ${COMPOSE_PROJECT_NAME}
+    container_name: sshwifty
     image: niruix/sshwifty:${SSHWIFTY_TAG:-latest}
     restart: unless-stopped
     volumes:

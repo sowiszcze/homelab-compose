@@ -1,0 +1,26 @@
+name: audiobookshelf
+
+services:
+
+  audiobookshelf:
+    image: ghcr.io/advplyr/audiobookshelf:${AUDIOBOOKSHELF_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
+    volumes:
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/config
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}:/metadata
+      - ${AUDIOBOOKS_PATH:?Path to audiobooks has to be defined}:/audiobooks
+      - ${PODCASTS_PATH:?Path to podcasts has to be defined}:/podcasts
+      - ${BOOKS_PATH:?Path to books has to be defined}:/books
+      - ${COMICS_PATH:?Path to comics has to be defined}:/comics
+    networks:
+      - exposed
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=80"
+
+networks:
+  exposed:
+    external: true
+  proxy:
+    external: true

@@ -1,41 +1,24 @@
-version: '3.9'
 name: mqttx
-# MQTTX stack
-
-# MQTT X Web
-#
-# Page: https://mqttx.app/
-# Repo: https://github.com/emqx/MQTTX
-# Dckr: https://hub.docker.com/r/emqx/mqttx-web
-# Cmps: https://mqttx.app/docs/web/get-started#privatization-deployment
-#
-# An open source MQTT 5.0 browser client and an online MQTT WebSocket client
-# tool. Use WebSocket to connect to MQTT in your browser to help you develop and
-# debug your MQTT services and applications faster without having to download
-# and install MQTTX locally.
 
 services:
 
   mqttx:
-    container_name: ${COMPOSE_PROJECT_NAME}
-    image: emqx/mqttx-web:${MQTTX_TAG:-latest}
-    restart: unless-stopped
+    image: emqx/mqttx-web:latest
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb-hc
     networks:
       - exposed
-      - proxy
+      - mqtt
     healthcheck:
-      test: "(ps -o comm | grep -q -m 1 http-server) && wget -q --spider http://localhost:80/ || exit 1"
+      test: "(ps -o comm | grep -q -m 1 http-server) && wget -q --spider http://127.0.0.1:80/ || exit 1"
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${NETWORK_DOMAIN:?Netowrk domain is not defined}`) || Host(`${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine domain is not defined}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
-      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=80"
+      - "traefik.http.services.mqttx.loadbalancer.server.port=80"
 
 networks:
   exposed:
     external: true
   proxy:
+    external: true
+  mqtt:
     external: true

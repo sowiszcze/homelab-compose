@@ -1,0 +1,74 @@
+name: grist
+
+services:
+
+  grist:
+    image: gristlabs/grist:${GRIST_TAG:-latest}
+    cap_add:
+      - SYS_PTRACE
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    volumes:
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}/data:/persist
+    environment:
+      GRIST_SESSION_SECRET: ${GRIST_SECRET:?Grist session secret has to be set}
+      GRIST_SANDBOX_FLAVOR: ${GRIST_SANDBOX:-gvisor}
+      APP_HOME_URL: https://${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}
+      GRIST_SINGLE_ORG: ${GRIST_ORG:-${COMPOSE_PROJECT_NAME}}
+      GRIST_FORCE_LOGIN: true
+      GRIST_HIDE_UI_ELEMENTS: ${GRIST_UI_HIDE}
+      GRIST_PAGE_TITLE_SUFFIX: ${GRIST_TITLE_SUFFIX}
+      APP_STATIC_INCLUDE_CUSTOM_CSS: ${GRIST_CUSTOM_CSS:-false}
+      GRIST_WIDGET_LIST_URL: ${GRIST_WIDGETS:-https://github.com/gristlabs/grist-widget/releases/download/latest/manifest.json}
+      TYPEORM_TYPE: postgres
+      TYPEORM_DATABASE: ${DB_NAME:-home}
+      TYPEORM_USERNAME: ${DB_USER:-${COMPOSE_PROJECT_NAME}}
+      TYPEORM_PASSWORD: ${DB_PASS:-${COMPOSE_PROJECT_NAME}}
+      TYPEORM_HOST: ${COMPOSE_PROJECT_NAME}-db
+      REDIS_URL: redis://${COMPOSE_PROJECT_NAME}-kv/0
+      GRIST_DOCS_MINIO_ACCESS_KEY: ${GRIST_S3_KEY:-${COMPOSE_PROJECT_NAME}}
+      GRIST_DOCS_MINIO_SECRET_KEY: ${GRIST_S3_SECRET:-${COMPOSE_PROJECT_NAME}}
+      GRIST_DOCS_MINIO_USE_SSL: ${GRIST_S3_SSL:-0}
+      GRIST_DOCS_MINIO_BUCKET: ${GRIST_S3_BUCKET:-${COMPOSE_PROJECT_NAME}}
+      GRIST_DOCS_MINIO_ENDPOINT: ${GRIST_S3_ENDPOINT:-minio}
+      GRIST_DOCS_MINIO_PORT: ${GRIST_S3_PORT:-9000}
+      GRIST_DOCS_MINIO_BUCKET_REGION: ${GRIST_S3_REGION:-none}
+      GRIST_DEFAULT_EMAIL: ${GRIST_OWNER}
+      GRIST_OIDC_IDP_ISSUER: ${GRIST_OIDC_ISSUER}
+      GRIST_OIDC_IDP_CLIENT_ID: ${GRIST_OIDC_CLIENT}
+      GRIST_OIDC_IDP_CLIENT_SECRET: ${GRIST_OIDC_SECRET}
+      GRIST_OIDC_IDP_SCOPES: ${GRIST_OIDC_SCOPES:-openid email profile}
+      GRIST_OIDC_SP_PROFILE_EMAIL_ATTR: ${GRIST_OIDC_EMAIL:-email}
+    networks:
+      - default
+      - proxy
+      - exposed
+      - s3
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8484"
+
+  postgres:
+    extends:
+      file: ../fragments/services.yml
+      service: postgres
+
+  valkey:
+    extends:
+      file: ../fragments/services.yml
+      service: valkey-persistent
+
+networks:
+  default:
+    internal: true
+  proxy:
+    external: true
+  exposed:
+    external: true
+  s3:
+    external: true

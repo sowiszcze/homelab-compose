@@ -1,44 +1,26 @@
-version: '3.9'
 name: vscode
-# VS Code in the browser stack
-
-# VS Code
-#
-# Page: https://coder.com/docs/code-server/latest
-# Repo: https://github.com/coder/code-server
-# Dckr: https://hub.docker.com/r/codercom/code-server
-# Cmps: https://github.com/coder/coder/blob/main/docker-compose.yaml
-#
-# Run VS Code on any machine anywhere and access it in the browser.
 
 services:
 
   vscode:
-    container_name: ${COMPOSE_PROJECT_NAME}
     image: codercom/code-server:${VSCODE_TAG:-debian}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-loc-hc
     user: root
     entrypoint: /usr/bin/entrypoint.sh --bind-addr 0.0.0.0:8080 --disable-telemetry --disable-update-check --extensions-dir /extensions --user-data-dir /user --auth none /workspace
     healthcheck:
-      test: "(ps -o comm | grep -q -m 1 node) && curl --fail http://localhost:8080/healthz || exit 1"
+      test: "(ps -o comm | grep -q -m 1 node) && curl --fail http://127.0.0.1:8080/healthz || exit 1"
     volumes:
-      - /etc/${COMPOSE_PROJECT_NAME}:/home/coder/.config/code-server/
-      - /srv/${COMPOSE_PROJECT_NAME}/extensions:/extensions
-      - /srv/${COMPOSE_PROJECT_NAME}/userdata:/user
-      - /etc:/workspace/config
-      - /srv:/workspace/data
-      - /var/log:/workspace/log
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/home/coder/.config/code-server/
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}/extensions:/extensions
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}/userdata:/user
+      - ${CONF_DIR:-/etc}:/workspace/config
+      - ${DATA_DIR:-/srv}:/workspace/data
+      - ${LOGS_DIR:-/var/log}:/workspace/log
     networks:
       - exposed
-      - proxy
-    restart: unless-stopped
     labels:
-      - "traefik.enable=true"
-      # Web UI
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8080"
 
 networks:

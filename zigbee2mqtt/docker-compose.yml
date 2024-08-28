@@ -1,39 +1,24 @@
-version: '3.9'
 name: zigbee2mqtt
-# Zigbee2MQTT stack
-
-# Page: https://www.zigbee2mqtt.io/
-# Code: https://github.com/Koenkk/zigbee2mqtt
-# Dckr: https://hub.docker.com/r/koenkk/zigbee2mqtt
-# Cmps: https://www.zigbee2mqtt.io/guide/installation/02_docker.html#docker-compose
-
-# Zigbee to MQTT bridge, get rid of your proprietary Zigbee bridges.
 
 services:
 
   zigbee2mqtt:
-    container_name: ${COMPOSE_PROJECT_NAME}
-    image: koenkk/zigbee2mqtt:${ZIGBEE2MQTT_TAG:-latest}
+    image: koenkk/zigbee2mqtt:${Z2M_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb-hc
     volumes:
-      - /srv/${COMPOSE_PROJECT_NAME}:/app/data
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}:/app/data
       - /run/udev:/run/udev:ro
     devices:
-      - /dev/serial/by-id/${ZIGBEE_ID:?Zigbee coordinator ID missing}:/dev/ttyACM0
+      - /dev/serial/by-id/${ZIGBEE_DEV_ID:?Zigbee device ID missing}:/dev/ttyACM0
     networks:
-      - proxy
       - exposed
     environment:
       - TZ
-    restart: unless-stopped
     healthcheck:
-      test: "(ps -o comm | grep -q -m 1 node) && wget -q --spider http://localhost:8080/|| exit 1"
+      test: "(ps -o comm | grep -q -m 1 node) && wget -q --spider http://127.0.0.1:8080/|| exit 1"
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8080"
 
 networks:

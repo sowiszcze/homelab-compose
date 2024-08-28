@@ -1,0 +1,55 @@
+name: firefish
+
+services:
+
+  postgresql:
+    extends:
+      file: ../fragments/services.yml
+      service: postgres
+    image: docker.io/groonga/pgroonga:${FIREFISH_PGROONGA_TAG:-latest-alpine-16-slim}
+
+  valkey:
+    extends:
+      file: ../fragments/services.yml
+      service: valkey-persistent
+
+  firefish:
+    image: registry.firefish.dev/firefish/firefish:${FIREFISH_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb-hc
+    deploy:
+      resources:
+        limits:
+          memory: 4096M
+    networks:
+      - default
+      - exposed
+      - proxy
+      - smtp
+    environment:
+      NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=3072
+    volumes:
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}/custom:/firefish/custom:ro
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}/files:/firefish/files
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/firefish/.config:ro
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    healthcheck:
+      test: curl -f http://localhost:3000 || exit 1
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=3000"
+
+networks:
+  default:
+    internal: true
+  smtp:
+    external: true
+  exposed:
+    external: true
+  proxy:
+    external: true

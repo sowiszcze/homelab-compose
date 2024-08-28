@@ -1,0 +1,63 @@
+name: receipt-wrangler
+
+services:
+
+  postgres:
+    container_name: ${COMPOSE_PROJECT_NAME}-db
+    image: postgres:${RECEIPTWRANGLER_DB_TAG:-alpine}
+    restart: unless-stopped
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 20s
+      interval: 10s
+      retries: 5
+      timeout: 10s
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/db:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: ${RECEIPTWRANGLER_DB_PASS:?database password required}
+      POSTGRES_USER: ${RECEIPTWRANGLER_DB_USER:-${COMPOSE_PROJECT_NAME}}
+      POSTGRES_DB: ${RECEIPTWRANGLER_DB_NAME:-${COMPOSE_PROJECT_NAME}}
+
+  api:
+    container_name: ${COMPOSE_PROJECT_NAME}-api
+    image: noah231515/receipt-wrangler-api:${RECEIPTWRANGLER_API_TAG:-latest}
+    restart: unless-stopped
+    networks:
+      - default
+      - proxy
+    command: ./api --env prod
+    volumes:
+      - /etc/${COMPOSE_PROJECT_NAME}:/go/api/config
+      - /srv/${COMPOSE_PROJECT_NAME}/data:/go/api/data
+      - /var/log/${COMPOSE_PROJECT_NAME}:/go/api/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-api.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-api.service=${COMPOSE_PROJECT_NAME}-api"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-api.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}-api.loadbalancer.server.port=8081"
+
+  ui:
+    container_name: ${COMPOSE_PROJECT_NAME}-ui
+    image: noah231515/receipt-wrangler-desktop:${RECEIPTWRANGLER_UI_TAG:-latest}
+    restart: unless-stopped
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-ui.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-ui.service=${COMPOSE_PROJECT_NAME}-ui"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-ui.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}-ui.loadbalancer.server.port=80"
+
+networks:
+  default:
+    internal: true
+  proxy:
+    external: true

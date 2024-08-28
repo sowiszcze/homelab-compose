@@ -3,12 +3,14 @@ name: nextcloud
 services:
 
   nextcloud:
-    container_name: ${COMPOSE_PROJECT_NAME}
     image: nextcloud:${NEXTCLOUD_TAG:-stable}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
     volumes: &nextcloud-volumes
-      - ${NEXTCLOUD_MAIN:-/srv/${COMPOSE_PROJECT_NAME}/app}:/var/www/html
-      - ${NEXTCLOUD_CUSTOM_APPS:-/srv/${COMPOSE_PROJECT_NAME}/apps}:/var/www/html/custom_apps
-      - ${NEXTCLOUD_CONFIG:-/etc/${COMPOSE_PROJECT_NAME}}:/var/www/html/config
+      - ${NEXTCLOUD_MAIN:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/app}:/var/www/html
+      - ${NEXTCLOUD_CUSTOM_APPS:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/apps}:/var/www/html/custom_apps
+      - ${NEXTCLOUD_CONFIG:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/var/www/html/config
       - ${NEXTCLOUD_DATA:-/var/${COMPOSE_PROJECT_NAME}/data}:/data:z
       - ${NEXTCLOUD_CUSTOM_THEME:-/var/${COMPOSE_PROJECT_NAME}/theme}:/var/www/html/themes/${MACHINE_DOMAIN}
     environment: &nextcloud-environment
@@ -18,70 +20,52 @@ services:
       APACHE_BODY_LIMIT: ${NEXTCLOUD_BODY_LIMIT:-1073741824}
       POSTGRES_DB: ${COMPOSE_PROJECT_NAME}
       POSTGRES_USER: ${NEXTCLOUD_DB_USER:-${COMPOSE_PROJECT_NAME}}
-      POSTGRES_PASSWORD: ${NEXTCLOUD_DB_PASS:?Database password has to be set}
       POSTGRES_HOST: ${COMPOSE_PROJECT_NAME}-db
       NEXTCLOUD_ADMIN_USER: ${NEXTCLOUD_ADM_USER:?Admin username has to be set}
       NEXTCLOUD_ADMIN_PASSWORD: ${NEXTCLOUD_ADM_PASS:?Admin password has to be set}
       REDIS_HOST: ${COMPOSE_PROJECT_NAME}-kv
-      REDIS_HOST_PASSWORD: ${NEXTCLOUD_KV_PASS:?Key-value store password has to be set}
       TRUSTED_PROXIES: "10.0.0.0/8 172.16.0.0/12 192.168.0.0/16"
-      NEXTCLOUD_TRUSTED_DOMAINS: "${COMPOSE_PROJECT_NAME}.${NETWORK_DOMAIN} ${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN}"
-      NEXTCLOUD_DOMAIN_NAME: ${COMPOSE_PROJECT_NAME}.${NETWORK_DOMAIN}
+      NEXTCLOUD_TRUSTED_DOMAINS: "${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}"
+      NEXTCLOUD_DOMAIN_NAME: ${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}
     restart: unless-stopped
-    depends_on:
-      - nextcloud-db
-      - nextcloud-kv
+    depends_on: &nextcloud-dependencies
+      nextcloud-db:
+        condition: service_healthy
+      nextcloud-kv:
+        condition: service_healthy
     networks: &nextcloud-networks
       - default
       - exposed
       - proxy
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${NETWORK_DOMAIN:?Netowrk domain is not defined}`, `${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine domain is not defined}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=80"
 
   nextcloud-db:
-    container_name: ${COMPOSE_PROJECT_NAME}-db
-    image: postgres:${NEXTCLOUD_POSTGRES_TAG:-alpine}
-    restart: unless-stopped
-    networks:
-      - default
-    volumes:
-      - /var/${COMPOSE_PROJECT_NAME}/db:/var/lib/postgresql/data:Z
+    extends:
+      file: ../fragments/services.yml
+      service: postgres
     environment:
-      POSTGRES_DB: ${COMPOSE_PROJECT_NAME}
-      POSTGRES_USER: ${NEXTCLOUD_DB_USER:-${COMPOSE_PROJECT_NAME}}
-      POSTGRES_PASSWORD: ${NEXTCLOUD_DB_PASS}
+      POSTGRES_HOST_AUTH_METHOD: trust
 
   nextcloud-kv:
-    container_name: ${COMPOSE_PROJECT_NAME}-kv
-    image: valkey/valkey:${NEXTCLOUD_VALKEY_TAG:-7.2-alpine}
-    command: "--requirepass ${NEXTCLOUD_KV_PASS} --save 60 1 --loglevel warning"
-    restart: unless-stopped
-    networks:
-      - default
-    volumes:
-      - /var/${COMPOSE_PROJECT_NAME}/kv:/data:Z
+    extends:
+      file: ../fragments/services.yml
+      service: valkey-persistent
 
   nextcloud-cron:
-    container_name: ${COMPOSE_PROJECT_NAME}-cron
     image: nextcloud:${NEXTCLOUD_CRON_TAG:-apache}
-    restart: unless-stopped
+    container_name: ${COMPOSE_PROJECT_NAME}-cron
+    extends:
+      file: ../fragments/services.yml
+      service: service-sub
     volumes: *nextcloud-volumes
     environment: *nextcloud-environment
     entrypoint: /cron.sh
     networks: *nextcloud-networks
-    depends_on:
-      - nextcloud-db
-      - nextcloud-kv
+    depends_on: *nextcloud-dependencies
 
 networks:
   default:
-    internal: true
   exposed:
     external: true
   proxy:

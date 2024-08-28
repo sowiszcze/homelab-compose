@@ -1,23 +1,9 @@
-version: '3.9'
 name: vaultwarden
-# Vaultwarden stack
-
-# Vaultwarden
-#
-# Page: https://www.vaultwarden.net/
-# Code: https://github.com/dani-garcia/vaultwarden
-# Dckr: https://hub.docker.com/r/vaultwarden/server
-# Cmps: https://github.com/dani-garcia/vaultwarden/wiki/Using-Docker-Compose
-#
-# Alternative implementation of the Bitwarden server API written in Rust and
-# compatible with upstream Bitwarden clients*, perfect for self-hosted
-# deployment where running the official resource-heavy service might not be
-# ideal.
 
 services:
 
   vaultwarden:
-    image: vaultwarden/server:${VAULTWARDEN:-alpine}
+    image: vaultwarden/server:${VAULTWARDEN_TAG:-alpine}
     container_name: ${COMPOSE_PROJECT_NAME}
     restart: unless-stopped
     networks:
@@ -26,28 +12,15 @@ services:
       - smtp
     environment:
       - WEBSOCKET_ENABLED
-      # Below env variables are needed only on init
-      #- ADMIN_TOKEN
-      #- DOMAIN
-      #- SIGNUPS_ALLOWED
-      #- SMTP_HOST
-      #- SMTP_FROM
-      #- SMTP_PORT
-      #- SMTP_SECURITY
-      #- SMTP_USERNAME
-      #- SMTP_PASSWORD
     volumes:
-      - /srv/${COMPOSE_PROJECT_NAME}:/data/
+      - data:/data/
     labels:
       - "traefik.enable=true"
       # HTTP(S) service
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=${VAULTWARDEN_CUSTOM_SUBDOMAIN:+Host(`${VAULTWARDEN_CUSTOM_SUBDOMAIN}.${COMPOSE_DOMAIN}`) || }Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=80"
-      # Further reading on proxying VaultWarden: https://github.com/dani-garcia/vaultwarden/wiki/Proxy-examples
 
 networks:
   proxy:

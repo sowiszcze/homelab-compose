@@ -1,0 +1,29 @@
+name: localai
+
+services:
+
+  localai:
+    image: localai/localai:${LOCALAI_TAG:-latest-aio-cpu}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb-hc
+    group_add:
+      - "${RENDER_GROUP:?Host render group ID missing}"
+    devices:
+      - ${GPU_DEV:-/dev/dri/renderD128}:${GPU_DEV:-/dev/dri/renderD128} # For hwaccel
+    environment:
+      - DEBUG=${LOCAL_AI_DEBUGGING:-false}
+    volumes:
+      - ${LOCALAI_MODELS_DIR:-/srv/${COMPOSE_PROJECT_NAME}}:/build/models:cached
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/readyz"]
+    networks:
+      - exposed
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8080"
+
+networks:
+  proxy:
+    external: true
+  exposed:
+    external: true

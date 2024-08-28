@@ -4,7 +4,7 @@ services:
 
   server:
     container_name: ${COMPOSE_PROJECT_NAME}
-    image: archivebox/archivebox:${ARCHIVEBOX_VERSION:-dev}
+    image: archivebox/archivebox:${ARCHIVEBOX_TAG:-latest}
     command: server --quick-init 0.0.0.0:8000
     restart: unless-stopped
     volumes:
@@ -29,8 +29,6 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8000"
@@ -49,7 +47,7 @@ services:
 
   scheduler:
     container_name: ${COMPOSE_PROJECT_NAME}-scheduler
-    image: archivebox/archivebox:${ARCHIVEBOX_TAG:-dev}
+    image: archivebox/archivebox:${ARCHIVEBOX_TAG:-latest}
     restart: unless-stopped
     command: schedule --foreground
     environment:

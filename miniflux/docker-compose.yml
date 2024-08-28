@@ -1,0 +1,49 @@
+name: miniflux
+
+services:
+
+  miniflux:
+    image: miniflux/miniflux:${MINIFLUX_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${COMPOSE_PROJECT_NAME}:${MINIFLUX_DB_PASS:?Database password has to be set}@${COMPOSE_PROJECT_NAME}-db/${COMPOSE_PROJECT_NAME}?sslmode=disable
+      RUN_MIGRATIONS: 1
+      CREATE_ADMIN: 1
+      ADMIN_USERNAME: ${MINIFLUX_ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${MINIFLUX_ADMIN_PASS:?Admin password has to be set}
+      BASE_URL: https://${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}
+      FETCH_YOUTUBE_WATCH_TIME: 1
+      LISTEN_ADDR: 0.0.0.0:8080
+      METRICS_COLLECTOR: 1
+      OAUTH2_PROVIDER: oidc
+      OAUTH2_CLIENT_ID: ${MINIFLUX_OAUTH2_CLIENT}
+      OAUTH2_CLIENT_SECRET: ${MINIFLUX_OAUTH2_SECRET}
+      OAUTH2_REDIRECT_URL: https://${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}/oauth2/oidc/callback
+      OAUTH2_OIDC_DISCOVERY_ENDPOINT: https://auth.${COMPOSE_DOMAIN}/application/o/${COMPOSE_PROJECT_NAME}/
+      OAUTH2_USER_CREATION: 1
+    networks:
+      - default
+      - exposed
+      - proxy
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8080"
+
+  postgres:
+    extends:
+      file: ../fragments/services.yml
+      service: postgres
+    environment:
+      POSTGRES_PASSWORD: ${MINIFLUX_DB_PASS}
+
+networks:
+  default:
+    internal: true
+  exposed:
+    external: true
+  proxy:
+    external: true

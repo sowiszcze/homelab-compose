@@ -1,0 +1,35 @@
+name: priviblur
+
+services:
+
+  valkey:
+    extends:
+      file: ../fragments/services.yml
+      service: valkey-ephemeral
+
+  priviblur:
+    image: quay.io/syeopite/priviblur:${PRIVIBLUR_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
+    networks:
+      - default
+      - exposed
+    environment:
+      PRIVIBLUR_CONFIG_LOCATION: /priviblur/config/config.toml
+    volumes:
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/priviblur/config:Z,ro
+    depends_on:
+      valkey:
+        condition: service_healthy
+    labels:
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=${AUTH_MIDDLEWARE:?Auth middleware is not defined}"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8000"
+
+networks:
+  default:
+    internal: true
+  exposed:
+    external: true
+  proxy:
+    external: true

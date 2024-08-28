@@ -2,26 +2,28 @@ name: watchtower
 
 services:
 
-  czkawka:
+  watchtower:
     image: containrrr/watchtower:${WATCHTOWER_TAG:-latest}
-    container_name: ${COMPOSE_PROJECT_NAME}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-loc
     volumes:
+      - /etc/localtime:/etc/localtime:ro
       - /var/run/docker.sock:/var/run/docker.sock
-    restart: unless-stopped
+      - ${DOCKER_CONFIG_PATH:-/root/.docker/config.json}:/config.json
     environment:
-      WATCHTOWER_LABEL_ENABLE: true
+      WATCHTOWER_CLEANUP: true
+      WATCHTOWER_INCLUDE_RESTARTING: true
+      WATCHTOWER_INCLUDE_STOPPED: true
+      WATCHTOWER_MONITOR_ONLY: true
       WATCHTOWER_NO_RESTART: true
+      WATCHTOWER_HTTP_API_METRICS: true
+      WATCHTOWER_HTTP_API_TOKEN: ${WATCHTOWER_TOKEN:?Watchtower API token has to be set}
+      WATCHTOWER_SCHEDULE: "0 0 */6 * * *"
     networks:
-      - proxy
       - exposed
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Compose FQDN missing}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
-      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=5800"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8080"
 
 networks:
   proxy:

@@ -1,22 +1,9 @@
-version: '3.9'
 name: maker-management-platform
-# Maker Management Platform stack
-
-# Maker Management Platform
-#
-# Page: N/A
-# Repo: https://github.com/Maker-Management-Platform/docs
-# Dckr: https://github.com/maker-management-platform/agent/pkgs/container/agent
-# Cmps: https://github.com/Maker-Management-Platform/docs#runing-mmp-locally
-#
-# Maker Management Platform, or mmp, aims to simplify and unify the management
-# of a variety of digital assets related to 3d printing, manufactoring, laser
-# engraving and such.
 
 services:
 
   agent:
-    image: ghcr.io/maker-management-platform/agent:latest
+    image: ghcr.io/maker-management-platform/agent:${MMP_AGENT_TAG:-latest}
     container_name: ${COMPOSE_PROJECT_NAME}-agent
     hostname: ${COMPOSE_PROJECT_NAME}-agent
     volumes:
@@ -39,7 +26,7 @@ services:
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}-agent.loadbalancer.server.port=8000"
 
   ui:
-    image: ghcr.io/maker-management-platform/mmp-ui:latest
+    image: ghcr.io/maker-management-platform/mmp-ui:${MMP_UI_TAG:-latest}
     container_name: ${COMPOSE_PROJECT_NAME}-ui
     hostname: ${COMPOSE_PROJECT_NAME}-ui
     environment:
@@ -60,6 +47,7 @@ services:
 
 networks:
   default:
+    internal: true
   exposed:
     external: true
   proxy:

@@ -1,0 +1,59 @@
+name: invidious
+
+services:
+
+  postgres:
+    container_name: ${COMPOSE_PROJECT_NAME}-db
+    image: postgres:${INVIDIOUS_POSTGRES_TAG:-14-alpine}
+    restart: unless-stopped
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 20s
+      interval: 5s
+      retries: 15
+      timeout: 3s
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/db:/var/lib/postgresql/data
+      - /srv/${COMPOSE_PROJECT_NAME}/source/config/sql:/config/sql
+      - /srv/${COMPOSE_PROJECT_NAME}/source/docker/init-invidious-db.sh:/docker-entrypoint-initdb.d/init-invidious-db.sh
+    environment:
+      POSTGRES_PASSWORD: ${INVIDIOUS_DB_PASS:?database password required}
+      POSTGRES_USER: ${INVIDIOUS_DB_USER:-${COMPOSE_PROJECT_NAME}}
+      POSTGRES_DB: ${INVIDIOUS_DB_NAME:-${COMPOSE_PROJECT_NAME}}
+
+  invidious:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: quay.io/invidious/invidious:${INVIDIOUS_TAG:-latest}
+    restart: unless-stopped
+    networks:
+      - default
+      - proxy
+      - exposed
+    healthcheck:
+      test: wget -nv --tries=1 --spider http://127.0.0.1:3000/api/v1/trending || exit 1
+      start_period: 60s
+      interval: 5s
+      retries: 15
+      timeout: 3s
+    volumes:
+      - /etc/${COMPOSE_PROJECT_NAME}/config.yml:/invidious/config/config.yml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=${INVIDIOUS_DOMAIN:+Host(`${INVIDIOUS_DOMAIN}`) || }Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=${AUTH_MIDDLEWARE:?Auth middleware is not defined}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=3000"
+
+networks:
+  default:
+    internal: true
+  exposed:
+    external: true
+  proxy:
+    external: true

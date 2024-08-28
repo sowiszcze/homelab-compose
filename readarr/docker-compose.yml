@@ -1,0 +1,23 @@
+name: readarr
+
+services:
+
+  readarr:
+    image: ghcr.io/hotio/readarr:${READARR_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-hotio-arr
+    volumes:
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/config
+      - ${BOOKS_DIR:?Books directory has to be set}:/data/media
+      - ${DOWNLOAD_DIR:?Download directory has to be set}:/data/download
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8787"
+
+networks:
+  exposed:
+    external: true
+  proxy:
+    external: true
+  multimedia:
+    external: true

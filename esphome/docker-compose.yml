@@ -1,38 +1,19 @@
-version: '3.9'
 name: esphome
-# ESPHome stack
-
-# ESPHome
-#
-# Page: https://esphome.io/
-# Repo: https://github.com/esphome/esphome
-# Dckr: https://github.com/esphome/esphome/pkgs/container/esphome
-# Cmps: https://esphome.io/guides/getting_started_command_line
-#
-# ESPHome is a system to control your ESP8266/ESP32 and RP2040 by simple yet
-# powerful configuration files and control them remotely through Home Automation
-# systems.
 
 services:
 
-  esphome:
-    container_name: ${COMPOSE_PROJECT_NAME}
-    image: ghcr.io/esphome/esphome:${ESPHOME_TAG:-stable}
+  app:
+    image: ghcr.io/esphome/esphome:${ESPHOME_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-hc
     volumes:
-      - /etc/${COMPOSE_PROJECT_NAME}:/config
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/config
       - /etc/localtime:/etc/localtime:ro
     restart: always
     healthcheck:
       test: "(curl --fail --silent http://localhost:6052/ > /dev/null) || exit 1"
     privileged: true
-    network_mode: host # due to this, web interface is available on default port 6052
+    network_mode: host
     environment:
-      - ESPHOME_DASHBOARD_USE_PING # set to true if you want to use the web interface
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${NETWORK_DOMAIN:?Netowrk domain is not defined}`) || Host(`${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine domain is not defined}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
-      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=6052"
+      ESPHOME_DASHBOARD_USE_PING: ${ESPHOME_USE_PING:-true}

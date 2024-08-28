@@ -1,37 +1,19 @@
-version: '3.9'
 name: uptime-kuma
-# Uptime Kuma stack
-
-# Uptime Kuma
-#
-# Page: https://uptime.kuma.pet/
-# Code: https://github.com/louislam/uptime-kuma
-# Dckr:https://github.com/louislam/uptime-kuma/blob/master/docker/docker-compose-dev.yml
-# Cmps: https://github.com/louislam/uptime-kuma/blob/master/docker/docker-compose.yml
-#
-# Uptime Kuma is an easy-to-use self-hosted monitoring tool.
 
 services:
 
   uptime-kuma:
-    container_name: ${COMPOSE_PROJECT_NAME}
-    hostname: ${COMPOSE_PROJECT_NAME}
-    image: louislam/uptime-kuma:${UPTIME_KUMA_TAG:-alpine}
-    restart: unless-stopped
+    image: louislam/uptime-kuma:${UPTIMEKUMA_TAG:-alpine}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-loc-hc
     networks:
       - exposed
-      - proxy
       - smarthome
     volumes:
-      - /srv/${COMPOSE_PROJECT_NAME}:/app/data
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}:/app/data
       - /var/run/docker.sock:/var/run/docker.sock
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=3001"
 
 networks:

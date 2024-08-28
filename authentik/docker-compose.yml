@@ -3,46 +3,21 @@ name: authentik
 services:
 
   authentik-db:
-    container_name: ${COMPOSE_PROJECT_NAME}-db
-    image: postgres:${AUTHENTIK_DB_TAG:-12-alpine}
-    restart: unless-stopped
-    networks:
-      - default
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
-      start_period: 20s
-      interval: 30s
-      retries: 5
-      timeout: 5s
-    volumes:
-      - /srv/${COMPOSE_PROJECT_NAME}/db:/var/lib/postgresql/data
-    environment:
-      POSTGRES_PASSWORD: ${PG_PASS:?database password required}
-      POSTGRES_USER: ${PG_USER:-${COMPOSE_PROJECT_NAME}}
-      POSTGRES_DB: ${PG_DB:-${COMPOSE_PROJECT_NAME}}
-    env_file:
-      - stack.env
+    extends:
+      file: ../fragments/services.yml
+      service: postgres
 
   authentik-kv:
-    container_name: ${COMPOSE_PROJECT_NAME}-kv
-    image: valkey/valkey:${AUTHENTIK_KV_TAG:-alpine}
-    command: --save 60 1 --loglevel warning
-    restart: unless-stopped
-    networks:
-      - default
-    healthcheck:
-      test: ["CMD-SHELL", "valkey-cli ping | grep PONG"]
-      start_period: 20s
-      interval: 30s
-      retries: 5
-      timeout: 3s
-    volumes:
-      - /srv/${COMPOSE_PROJECT_NAME}/kv:/data
+    extends:
+      file: ../fragments/services.yml
+      service: valkey-persistent
 
   authentik-server:
     container_name: ${COMPOSE_PROJECT_NAME}-server
     image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-latest}
-    restart: unless-stopped
+    extends:
+      file: ../fragments/services.yml
+      service: service-sub-hc
     networks:
       - default
       - proxy
@@ -51,12 +26,12 @@ services:
     environment:
       AUTHENTIK_REDIS__HOST: ${COMPOSE_PROJECT_NAME}-kv
       AUTHENTIK_POSTGRESQL__HOST: ${COMPOSE_PROJECT_NAME}-db
-      AUTHENTIK_POSTGRESQL__USER: ${PG_USER:-${COMPOSE_PROJECT_NAME}}
-      AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-${COMPOSE_PROJECT_NAME}}
-      AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
+      AUTHENTIK_POSTGRESQL__USER: ${DB_USER:-${COMPOSE_PROJECT_NAME}}
+      AUTHENTIK_POSTGRESQL__NAME: ${DB_NAME:-${COMPOSE_PROJECT_NAME}}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${DB_PASS}
     volumes:
-      - /srv/${COMPOSE_PROJECT_NAME}/media:/media
-      - /srv/${COMPOSE_PROJECT_NAME}/custom-templates:/templates
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}/media:/media
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}/custom-templates:/templates
     env_file:
       - stack.env
     depends_on:
@@ -66,27 +41,18 @@ services:
         condition: service_healthy
     labels:
       - "traefik.enable=true"
-      # Base domain
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-base.rule=Host(`auth.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-base.middlewares=${AUTHENTIK_CORS_MIDDLEWARE:-cors-allow-all@file}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-base.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-base.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-base.service=${COMPOSE_PROJECT_NAME}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-base.entrypoints=http,https"
-      # Additional domain
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-additional.rule=${AUTHENTIK_HOST_RULE:?Rule for additional endpoints missing}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-additional.middlewares=${AUTHENTIK_CORS_MIDDLEWARE:-cors-allow-all@file}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-additional.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-additional.tls.certresolver=${CERT_RESOLVER}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-additional.service=${COMPOSE_PROJECT_NAME}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-additional.entrypoints=http,https"
-      # Service
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=${DOMAIN_OVERRIDE:+Host(`${DOMAIN_OVERRIDE}`) || }Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)${AUTHENTIK_HOST_RULE:+ || ${AUTHENTIK_HOST_RULE}}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=${AUTHENTIK_CORS_MIDDLEWARE:-cors-allow-all@file}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=9000"
 
   authentik-worker:
     container_name: ${COMPOSE_PROJECT_NAME}-worker
     image: ghcr.io/goauthentik/server:${AUTHENTIK_TAG:-latest}
-    restart: unless-stopped
+    extends:
+      file: ../fragments/services.yml
+      service: service-sub-hc
     networks:
       - default
       - smtp
@@ -94,15 +60,15 @@ services:
     environment:
       AUTHENTIK_REDIS__HOST: ${COMPOSE_PROJECT_NAME}-kv
       AUTHENTIK_POSTGRESQL__HOST: ${COMPOSE_PROJECT_NAME}-db
-      AUTHENTIK_POSTGRESQL__USER: ${PG_USER:-${COMPOSE_PROJECT_NAME}}
-      AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-${COMPOSE_PROJECT_NAME}}
-      AUTHENTIK_POSTGRESQL__PASSWORD: ${PG_PASS}
+      AUTHENTIK_POSTGRESQL__USER: ${DB_USER:-${COMPOSE_PROJECT_NAME}}
+      AUTHENTIK_POSTGRESQL__NAME: ${DB_NAME:-${COMPOSE_PROJECT_NAME}}
+      AUTHENTIK_POSTGRESQL__PASSWORD: ${DB_PASS}
     user: root
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - /srv/${COMPOSE_PROJECT_NAME}/media:/media
-      - /srv/${COMPOSE_PROJECT_NAME}/certs:/certs
-      - /srv/${COMPOSE_PROJECT_NAME}/custom-templates:/templates
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}/media:/media
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}/certs:/certs
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}/custom-templates:/templates
     env_file:
       - stack.env
     depends_on:

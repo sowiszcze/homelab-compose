@@ -2,81 +2,54 @@ name: immich
 
 services:
 
-  immich-server:
-    container_name: ${COMPOSE_PROJECT_NAME}-server
+  immich:
     image: ghcr.io/immich-app/immich-server:${IMMICH_TAG:-release}
-    command: ['start.sh', 'immich']
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb-hc
+    group_add:
+      - "${RENDER_GROUP:?Host render group ID missing}"
+    devices:
+      - ${GPU_DEV:-/dev/dri/renderD128}:${GPU_DEV:-/dev/dri/renderD128} # For hwaccel
     volumes:
-      - ${UPLOAD_LOCATION}:/usr/src/app/upload
+      - ${UPLOAD_LOCATION:?Upload directory has to be set}:/usr/src/app/upload
       - /etc/localtime:/etc/localtime:ro
     env_file:
       - stack.env
     depends_on:
-      - immich-kv
-      - immich-db
-    restart: unless-stopped
+      immich-kv:
+        condition: service_healthy
+      immich-db:
+        condition: service_healthy
     networks:
       - default
       - exposed
-      - proxy
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${IMMICH_DOMAIN:-${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=3001"
 
-  immich-microservices:
-    container_name: ${COMPOSE_PROJECT_NAME}-microservices
-    image: ghcr.io/immich-app/immich-server:${IMMICH_TAG:-release}
-    command: ['start.sh', 'microservices']
-    devices:
-      - /dev/dri:/dev/dri
-    volumes:
-      - ${UPLOAD_LOCATION}:/usr/src/app/upload
-      - /etc/localtime:/etc/localtime:ro
-    env_file:
-      - stack.env
-    depends_on:
-      - immich-kv
-      - immich-db
-    restart: unless-stopped
-    networks:
-      - default
-
   immich-ml:
-    container_name: ${COMPOSE_PROJECT_NAME}-ml
     image: ghcr.io/immich-app/immich-machine-learning:${IMMICH_ML_TAG:-release}
+    container_name: ${COMPOSE_PROJECT_NAME}-ml
+    extends:
+      file: ../fragments/services.yml
+      service: service-sub-hc
     volumes:
-      - /srv/${COMPOSE_PROJECT_NAME}/ml:/cache
+      - ${PROJECT_ML_CACHE_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/ml}:/cache
     env_file:
       - stack.env
-    restart: unless-stopped
-    networks:
-      - default
 
   immich-kv:
     container_name: ${COMPOSE_PROJECT_NAME}-kv
-    image: registry.redict.io/redict:${IMMICH_KV_TAG:-latest}
-    restart: unless-stopped
-    command: '--protected-mode no'
-    networks:
-      - default
+    extends:
+      file: ../fragments/services.yml
+      service: valkey-ephemeral
 
   immich-db:
     container_name: ${COMPOSE_PROJECT_NAME}-db
     image: tensorchord/pgvecto-rs:${IMMICH_DB_TAG:-pg14-v0.2.0}
-    environment:
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_USER: ${DB_USERNAME}
-      POSTGRES_DB: ${DB_DATABASE_NAME}
-    volumes:
-      - /srv/${COMPOSE_PROJECT_NAME}/db:/var/lib/postgresql/data
-    restart: unless-stopped
-    networks:
-      - default
+    extends:
+      file: ../fragments/services.yml
+      service: postgres
 
 networks:
   default:

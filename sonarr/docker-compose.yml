@@ -1,0 +1,23 @@
+name: sonarr
+
+services:
+
+  sonarr:
+    image: ghcr.io/hotio/sonarr:${SONARR_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-hotio-arr
+    volumes:
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/config
+      - ${SHOWS_DIR:?Movies directory has to be set}:/data/media
+      - ${DOWNLOAD_DIR:?Download directory has to be set}:/data/download
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8989"
+
+networks:
+  exposed:
+    external: true
+  proxy:
+    external: true
+  multimedia:
+    external: true

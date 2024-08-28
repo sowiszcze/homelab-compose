@@ -1,11 +1,10 @@
-version: '3.9'
 name: minio
 
 services:
 
   minio:
-    image: quay.io/minio/minio:${MINIO_TAG:-latest}
-    container_name: minio
+    image: minio/minio:${MINIO_TAG:-latest}
+    container_name: ${COMPOSE_PROJECT_NAME}
     command: minio server --console-address ":9001"
     environment:
       - MINIO_CONFIG_ENV_FILE=/etc/config.env
@@ -13,22 +12,27 @@ services:
       - /etc/${COMPOSE_PROJECT_NAME}/.env:/etc/config.env
       - /srv/${COMPOSE_PROJECT_NAME}:/data
     networks:
-      - exposed
-      - proxy
+      exposed:
+        priority: 20
+      proxy:
+        priority: 10
+      s3:
+        priority: 30
+        aliases:
+          - cdn.${COMPOSE_DOMAIN}
+          - minio.${COMPOSE_DOMAIN}
+          - s3.${COMPOSE_DOMAIN}
+          - ${COMPOSE_PROJECT_NAME}
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
       # MinIO server
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-server.rule=HostSNI(`cdn.${COMPOSE_DOMAIN:?Compose domain is not defined}`, `cdn.${MACHINE_DOMAIN:?Machine domain is not defined}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-server.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-server.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-server.rule=Host(`cdn.${COMPOSE_DOMAIN:?Compose domain is not defined}`)"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-server.service=${COMPOSE_PROJECT_NAME}-server"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-server.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}-server.loadbalancer.server.port=9000"
       # MinIO console
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-console.rule=HostSNI(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}`, `${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-console.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-console.tls.certresolver=${CERT_RESOLVER}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-console.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}`)"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-console.service=${COMPOSE_PROJECT_NAME}-console"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-console.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}-console.loadbalancer.server.port=9001"
@@ -37,4 +41,6 @@ networks:
   exposed:
     external: true
   proxy:
+    external: true
+  s3:
     external: true

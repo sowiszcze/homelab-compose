@@ -1,14 +1,16 @@
+version: '3.9'
 name: netalertx
 
 services:
   netalertx:
-    container_name: ${COMPOSE_PROJECT_NAME}
     image: jokobsk/netalertx:${NETALERTX_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main
     volumes:
-      - /etc/${COMPOSE_PROJECT_NAME}:/app/config
-      - /srv/${COMPOSE_PROJECT_NAME}/db:/app/db
-      - /var/log/${COMPOSE_PROJECT_NAME}:/app/front/log
-    restart: unless-stopped
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/app/config
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/db}:/app/db
+      - ${PROJECT_LOGS_DIR:-${LOGS_DIR:-/var/log}/${COMPOSE_PROJECT_NAME}}:/app/front/log
     environment:
       - TZ
     network_mode: host

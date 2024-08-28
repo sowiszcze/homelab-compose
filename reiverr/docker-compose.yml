@@ -1,0 +1,24 @@
+name: reiverr
+
+services:
+
+  reiverr:
+    image: ghcr.io/aleksilassila/reiverr:${REIVERR_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
+    volumes:
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/config
+    networks:
+      - exposed
+      - multimedia
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=9494"
+
+networks:
+  exposed:
+    external: true
+  proxy:
+    external: true
+  multimedia:
+    external: true

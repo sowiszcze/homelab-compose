@@ -1,19 +1,4 @@
-version: "3.9"
 name: penpot
-# Penpot stack
-
-# Penpot
-#
-# Page: https://penpot.app/
-# Code: https://github.com/penpot
-# Dckr: https://hub.docker.com/u/penpotapp
-# Cmps: https://github.com/penpot/penpot/blob/develop/docker/images/docker-compose.yaml
-#
-# Penpot is the first Open Source design and prototyping platform meant for
-# cross-domain teams. Non dependent on operating systems, Penpot is web based
-# and works with open standards (SVG). Penpot invites designers all over the
-# world to fall in love with open source while getting developers excited about
-# the design process in return.
 
 services:
 
@@ -36,8 +21,6 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=80"
@@ -49,23 +32,30 @@ services:
     volumes:
       - /srv/${COMPOSE_PROJECT_NAME}/assets:/opt/data/assets
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
     networks:
       - default
       - exposed
       - smtp
+      - s3
     environment:
       - PENPOT_FLAGS=${PENPOT_BACK_FLAGS:-enable-registration enable-login-with-password disable-email-verification enable-smtp enable-prepl-server}
       - PENPOT_SECRET_KEY=${PENPOT_SECRET:?Penpot secret not set}
       - PENPOT_PREPL_HOST=${PENPOT_PREPL_IP:-0.0.0.0}
       - PENPOT_PUBLIC_URI=https://${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}
-      - PENPOT_DATABASE_URI=postgresql://${COMPOSE_PROJECT_NAME}-postgres/${PENPOT_DB_NAME:-penpot}
+      - PENPOT_DATABASE_URI=postgresql://${COMPOSE_PROJECT_NAME}-db/${PENPOT_DB_NAME:-penpot}
       - PENPOT_DATABASE_USERNAME=${PENPOT_DB_USER:-penpot}
       - PENPOT_DATABASE_PASSWORD=${PENPOT_DB_PASS:-penpot}
-      - PENPOT_REDIS_URI=${PENPOT_REDIS_ADDR:-redis://${COMPOSE_PROJECT_NAME}-redis/0}
+      - PENPOT_REDIS_URI=${PENPOT_REDIS_ADDR:-redis://${COMPOSE_PROJECT_NAME}-kv/0}
       - PENPOT_ASSETS_STORAGE_BACKEND=${PENPOT_STORAGE:-assets-fs}
       - PENPOT_STORAGE_ASSETS_FS_DIRECTORY=/opt/data/assets
+      - AWS_ACCESS_KEY_ID
+      - AWS_SECRET_ACCESS_KEY
+      - PENPOT_STORAGE_ASSETS_S3_ENDPOINT
+      - PENPOT_STORAGE_ASSETS_S3_BUCKET
       - PENPOT_TELEMETRY_ENABLED=false
       - PENPOT_SMTP_DEFAULT_FROM
       - PENPOT_SMTP_DEFAULT_REPLY_TO
@@ -75,6 +65,17 @@ services:
       - PENPOT_SMTP_PASSWORD
       - PENPOT_SMTP_TLS
       - PENPOT_SMTP_SSL
+      - PENPOT_OIDC_CLIENT_ID
+      - PENPOT_OIDC_BASE_URI
+      - PENPOT_OIDC_CLIENT_SECRET
+      - PENPOT_OIDC_AUTH_URI
+      - PENPOT_OIDC_TOKEN_URI
+      - PENPOT_OIDC_USER_URI
+      - PENPOT_OIDC_ROLES
+      - PENPOT_OIDC_ROLES_ATTR
+      - PENPOT_OIDC_SCOPES
+      - PENPOT_OIDC_NAME_ATTR
+      - PENPOT_OIDC_EMAIL_ATTR
 
   exporter:
     container_name: ${COMPOSE_PROJECT_NAME}-exporter
@@ -83,14 +84,20 @@ services:
     networks:
       - default
     environment:
-      - PENPOT_PUBLIC_URI=https://${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}
-      - PENPOT_REDIS_URI=${PENPOT_REDIS_ADDR:-redis://${COMPOSE_PROJECT_NAME}-redis/0}
+      - PENPOT_PUBLIC_URI=http://${COMPOSE_PROJECT_NAME}-frontend
+      - PENPOT_REDIS_URI=${PENPOT_REDIS_ADDR:-redis://${COMPOSE_PROJECT_NAME}-kv/0}
 
   postgres:
-    container_name: ${COMPOSE_PROJECT_NAME}-postgres
-    image: postgres:${PENPOT_POSTGRES_TAG:-15}
+    container_name: ${COMPOSE_PROJECT_NAME}-db
+    image: postgres:${PENPOT_DB_TAG:-15}
     restart: unless-stopped
     stop_signal: SIGINT
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 5s
     volumes:
       - /srv/${COMPOSE_PROJECT_NAME}/postgres:/var/lib/postgresql/data
     networks:
@@ -101,10 +108,16 @@ services:
       - POSTGRES_USER=${PENPOT_DB_USER:-penpot}
       - POSTGRES_PASSWORD=${PENPOT_DB_PASS:-penpot}
 
-  redis:
-    container_name: ${COMPOSE_PROJECT_NAME}-redis
-    image: redis:${PENPOT_REDIS_TAG:-7}
+  valkey:
+    container_name: ${COMPOSE_PROJECT_NAME}-kv
+    image: valkey/valkey:${PENPOT_KV_TAG:-alpine}
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli ping | grep PONG"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 3s
     networks:
       - default
 
@@ -115,4 +128,6 @@ networks:
   proxy:
     external: true
   smtp:
+    external: true
+  s3:
     external: true

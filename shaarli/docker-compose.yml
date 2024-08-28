@@ -1,0 +1,27 @@
+name: shaarli
+
+services:
+
+  shaarli:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: ghcr.io/shaarli/shaarli:${SHAARLI_TAG:-latest}
+    restart: unless-stopped
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}:/var/www/shaarli/data
+      - /srv/${COMPOSE_PROJECT_NAME}-tpl/shaarli-default-dark:/var/www/shaarli/tpl/shaarli-default-dark
+      - /tmp/${COMPOSE_PROJECT_NAME}:/var/www/shaarli/cache
+    networks:
+      - exposed
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose domain is not defined}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=80"
+
+networks:
+  exposed:
+    external: true
+  proxy:
+    external: true

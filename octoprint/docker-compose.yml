@@ -1,0 +1,31 @@
+name: octoprint
+
+services:
+
+  app:
+    image: octoprint/octoprint:${OCTOPRINT_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
+    deploy:
+      resources:
+        limits:
+          cpus: ${OCTOPRINT_CPU_LIMIT:-'1.50'}
+          memory: ${OCTOPRINT_MEMORY_LIMIT:-5G}
+        reservations:
+          cpus: ${OCTOPRINT_CPU_RESERVERD:-'0.25'}
+          memory: ${OCTOPRINT_MEMORY_RESERVED:-2G}
+    networks:
+      - exposed
+    devices:
+      - ${PRINTER_DEVICE:?Device location of the printer has to be set}:/dev/ttyACM0
+    volumes:
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}:/octoprint
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=80"
+
+networks:
+  proxy:
+    external: true
+  exposed:
+    external: true

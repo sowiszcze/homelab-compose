@@ -1,0 +1,27 @@
+name: watchstate
+
+services:
+
+  watchstate:
+    image: ghcr.io/arabcoders/watchstate:${WATCHSTATE_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
+    user: "${UID:-1000}:${GID:-1000}"
+    volumes:
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/config
+    environment:
+      - WS_TZ=${TZ:-Etc/UTC}
+    networks:
+      - exposed
+      - multimedia
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8080"
+
+networks:
+  exposed:
+    external: true
+  proxy:
+    external: true
+  multimedia:
+    external: true

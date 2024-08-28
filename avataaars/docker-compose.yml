@@ -1,0 +1,16 @@
+name: avataaars
+
+services:
+
+  avataaars:
+    image: soulteary/avataaars-generator:${AVATAAARS_TAG:-2021.0802.0412}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
+    labels:
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=${AUTH_MIDDLEWARE:?Auth middleware is not defined}"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=80"
+
+networks:
+  proxy:
+    external: true

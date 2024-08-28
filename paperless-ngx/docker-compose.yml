@@ -1,35 +1,30 @@
-version: '3.9'
 name: paperless-ngx
-# Paperless-ngx stack
-
-# Paperless-ngx
-#
-# Page: https://docs.paperless-ngx.com/
-# Code: https://github.com/paperless-ngx/paperless-ngx
-# Dckr: https://github.com/paperless-ngx/paperless-ngx/pkgs/container/paperless-ngx
-# Cmps: https://github.com/paperless-ngx/paperless-ngx/blob/main/docker/compose/docker-compose.postgres-tika.yml
-#
-# A document management system that transforms your physical documents into a
-# searchable online archive so you can keep, well, less paper.
-# Paperless-ngx is the official successor to the original Paperless &
-# Paperless-ng projects and is designed to distribute the responsibility of
-# advancing and supporting the project among a team of people.
 
 services:
 
-  broker:
+  paperless-broker:
     container_name: ${COMPOSE_PROJECT_NAME}-broker
-    image: docker.io/library/redis:${PAPERLESS_REDIS_TAG:-7}
+    image: valkey/valkey:${PAPERLESS_KV_TAG:-alpine}
     restart: unless-stopped
-    volumes:
-      - /srv/${COMPOSE_PROJECT_NAME}/redis:/data
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli ping | grep PONG"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 3s
     networks:
       - default
 
-  db:
+  paperless-db:
     container_name: ${COMPOSE_PROJECT_NAME}-db
     image: docker.io/library/postgres:${PAPERLESS_POSTGRES_TAG:-15}
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 5s
     volumes:
       - /srv/${COMPOSE_PROJECT_NAME}/pg:/var/lib/postgresql/data
     networks:
@@ -39,18 +34,23 @@ services:
       POSTGRES_USER: ${PAPERLESS_POSTGRES_USER:-paperless}
       POSTGRES_PASSWORD: ${PAPERLESS_POSTGRES_PASS:-paperless}
 
-  paperless-ngx:
+  paperless:
     container_name: ${COMPOSE_PROJECT_NAME}
     image: ghcr.io/paperless-ngx/paperless-ngx:${PAPERLESS_TAG:-latest}
     restart: unless-stopped
     depends_on:
-      - paperless-db
-      - paperless-broker
-      - paperless-gotenberg
-      - paperless-tika
+      paperless-db:
+        condition: service_healthy
+      paperless-broker:
+        condition: service_healthy
+      paperless-gotenberg:
+        condition: service_started
+      paperless-tika:
+        condition: service_started
     networks:
       - default
       - proxy
+      - exposed
     volumes:
       - /srv/${COMPOSE_PROJECT_NAME}/data:/usr/src/paperless/data
       - /srv/${COMPOSE_PROJECT_NAME}/media:/usr/src/paperless/media
@@ -66,14 +66,12 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=${AUTH_MIDDLEWARE:?Auth middleware is not defined}"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8000"
 
-  gotenberg:
+  paperless-gotenberg:
     container_name: ${COMPOSE_PROJECT_NAME}-gotenberg
     image: docker.io/gotenberg/gotenberg:${PAPERLESS_GOTENBERG_TAG:-7.10}
     restart: unless-stopped
@@ -84,7 +82,7 @@ services:
     networks:
       - default
 
-  tika:
+  paperless-tika:
     container_name: ${COMPOSE_PROJECT_NAME}-tika
     image: ghcr.io/paperless-ngx/tika:${PAPERLESS_TIKA_TAG:-latest}
     restart: unless-stopped
@@ -93,5 +91,8 @@ services:
 
 networks:
   default:
+    internal: true
+  exposed:
+    external: true
   proxy:
     external: true

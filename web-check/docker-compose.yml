@@ -1,34 +1,18 @@
-version: '3.9'
 name: web-check
-# Web-Check stack
-
-# Web-Check
-#
-# Page: https://web-check.xyz/
-# Repo: https://github.com/Lissy93/web-check
-# Dckr: https://hub.docker.com/r/lissy93/web-check
-# Cmps: https://github.com/Lissy93/web-check/blob/master/docker-compose.yml
-#
-# All-in-one OSINT tool for analysing any website
 
 services:
 
   web-check:
-    container_name: web-check
     image: lissy93/web-check:${WEBCHECK_TAG:-latest}
-    restart: unless-stopped
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
     env_file: stack.env
     networks:
       - exposed
       - proxy
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=${AUTH_MIDDLEWARE:?Auth middleware name missing}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=3000"
 
 networks:

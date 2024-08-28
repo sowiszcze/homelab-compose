@@ -1,46 +1,38 @@
-version: '3.9'
 name: aria2
-# Aria2/-ng stack
-
-# Aria2 Pro Docker
-#
-# Page: N/A
-# Repo: https://github.com/P3TERX/Aria2-Pro-Docker
-# Dckr: https://hub.docker.com/r/p3terx/aria2-pro
-# Cmps: https://github.com/P3TERX/Aria2-Pro-Docker/blob/master/docker-compose.yml
-#
-# aria2 is a lightweight multi-protocol & multi-source command-line download
-# utility. It supports HTTP/HTTPS, FTP, SFTP, BitTorrent and Metalink. aria2 can
-# be manipulated via built-in JSON-RPC and XML-RPC interfaces.
 
 services:
 
-  daemon:
+  aria2-pro:
     image: p3terx/aria2-pro:${ARIA2_TAG:-latest}
-    container_name: aria2
-    hostname: aria2
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-hc
+    hostname: ${COMPOSE_PROJECT_NAME}
     environment:
-      - PUID
-      - PGID
-      - UMASK_SET
-      - RPC_SECRET
-      - RPC_PORT
-      - LISTEN_PORT
-      - DISK_CACHE
-      - IPV6_MODE
-      - UPDATE_TRACKERS
-      - CUSTOM_TRACKER_URL
+      - PUID=${UID:-1000}
+      - PGID=${GID:-1000}
+      - UMASK_SET=${UMASK:-022}
+      - RPC_SECRET=${SECRET:?No RPC secret set}
+      - RPC_PORT=${RPC_PORT:-6800}
+      - LISTEN_PORT=${BT_LISTEN_PORT:-6881-6999}
+      - DISK_CACHE=${CACHE:-64M}
+      - IPV6_MODE=${IPV6:-false}
+      - UPDATE_TRACKERS=${UPDATE_TRACKERS:-true}
+      - CUSTOM_TRACKER_URL=${CUSTOM_TRACKER_URL}
       - TZ
     volumes:
-      - /etc/${COMPOSE_PROJECT_NAME}:/config
-      - /media/downloads:/downloads
+      - ${ARIA_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/config
+      - ${DOWNLOADS_DIR:?Downloads directory has to be set}:/downloads
     networks:
       - default
       - exposed
       - proxy
+      - multimedia
+    ports:
+      - "${BT_LISTEN_PORT:-6881-6999}:${BT_LISTEN_PORT:-6881-6999}/tcp"
+      - "${BT_LISTEN_PORT:-6881-6999}:${BT_LISTEN_PORT:-6881-6999}/udp"
     healthcheck:
-      test: "netstat -ltun | grep -cqE -m 3 -e ':(6800|6888)' || exit 1"
-    restart: unless-stopped
+      test: "netstat -ltun | grep -cqE -m 3 -e ':${RPC_PORT:-6800}' || exit 1"
     logging: # Since Aria2 will continue to generate logs, limit the log size to 1M to prevent your hard disk from running out of space.
       driver: json-file
       options:
@@ -48,51 +40,42 @@ services:
     labels:
       - "traefik.enable=true"
       # JSON-RPC/XML-RPC via TCP
-      - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}-rpc-tcp.rule=HostSNI(`${COMPOSE_PROJECT_NAME}.${NETWORK_DOMAIN:?Netowrk domain is not defined}`) || HostSNI(`aria.${NETWORK_DOMAIN}`) || HostSNI(`${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine domain is not defined}`) || HostSNI(`aria.${MACHINE_DOMAIN}`)"
+      - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}-rpc-tcp.rule=HostSNI(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose domain is not defined}`)"
       - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}-rpc-tcp.tls=true"
       - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}-rpc-tcp.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
       - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}-rpc-tcp.service=${COMPOSE_PROJECT_NAME}-rpc-tcp"
-      - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}-rpc-tcp.entrypoints=${COMPOSE_PROJECT_NAME}-rpc-tcp"
-      - "traefik.tcp.services.${COMPOSE_PROJECT_NAME}-rpc-tcp.loadbalancer.server.port=6800"
+      - "traefik.tcp.routers.${COMPOSE_PROJECT_NAME}-rpc-tcp.entrypoints=aria-rpc-tcp"
+      - "traefik.tcp.services.${COMPOSE_PROJECT_NAME}-rpc-tcp.loadbalancer.server.port=${RPC_PORT:-6800}"
       # JSON-RPC/XML-RPC via UDP
       - "traefik.udp.routers.${COMPOSE_PROJECT_NAME}-rpc-udp.service=${COMPOSE_PROJECT_NAME}-rpc-udp"
-      - "traefik.udp.routers.${COMPOSE_PROJECT_NAME}-rpc-udp.entrypoints=${COMPOSE_PROJECT_NAME}-rpc-udp"
-      - "traefik.udp.services.${COMPOSE_PROJECT_NAME}-rpc-udp.loadbalancer.server.port=6800"
-      # TCP port number for BitTorrent downloads
-      - "traefik.tcp.routers.bittorrent.rule=HostSNI(`${COMPOSE_PROJECT_NAME}.${NETWORK_DOMAIN}`) || HostSNI(`aria.${NETWORK_DOMAIN}`) || HostSNI(`bittorrent.${NETWORK_DOMAIN}`) || HostSNI(`${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN}`) || HostSNI(`aria.${MACHINE_DOMAIN}`) || HostSNI(`bittorrent.${MACHINE_DOMAIN}`)"
-      - "traefik.tcp.routers.bittorrent.tls=true"
-      - "traefik.tcp.routers.bittorrent.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
-      - "traefik.tcp.routers.bittorrent.service=bittorrent"
-      - "traefik.tcp.routers.bittorrent.entrypoints=bittorrent"
-      - "traefik.tcp.services.bittorrent.loadbalancer.server.port=6888"
+      - "traefik.udp.routers.${COMPOSE_PROJECT_NAME}-rpc-udp.entrypoints=aria-rpc-udp"
+      - "traefik.udp.services.${COMPOSE_PROJECT_NAME}-rpc-udp.loadbalancer.server.port=${RPC_PORT:-6800}"
 
-  webui:
-    container_name: ariang
+  ariang:
     image: p3terx/ariang:${ARIANG_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb-hc
+    container_name: ${COMPOSE_PROJECT_NAME}-ng
     command: --port 6880 --ipv6
     networks:
       - default
-      - proxy
-    restart: unless-stopped
     depends_on:
-      daemon:
+      aria2-pro:
         condition: service_healthy
     logging:
       driver: json-file
       options:
         max-size: 1m
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.aria.rule=Host(`${COMPOSE_PROJECT_NAME}.${NETWORK_DOMAIN}`) || Host(`aria.${NETWORK_DOMAIN}`) || Host(`aria-ng.${NETWORK_DOMAIN}`) || Host(`ariang.${NETWORK_DOMAIN}`) || Host(`${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN}`) || Host(`aria.${MACHINE_DOMAIN}`) || Host(`aria-ng.${MACHINE_DOMAIN}`) || Host(`ariang.${MACHINE_DOMAIN}`)"
-      - "traefik.http.routers.aria.tls=true"
-      - "traefik.http.routers.aria.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
-      - "traefik.http.routers.aria.service=aria"
-      - "traefik.http.routers.aria.entrypoints=http,https"
-      - "traefik.http.services.aria.loadbalancer.server.port=6880"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=6880"
 
 networks:
   default:
+    internal: true
   exposed:
     external: true
   proxy:
+    external: true
+  multimedia:
     external: true

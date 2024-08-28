@@ -3,33 +3,22 @@ name: dozzle
 services:
 
   dozzle:
-    container_name: ${COMPOSE_PROJECT_NAME}
     image: amir20/dozzle:${DOZZLE_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-loc-hc
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - /srv/${COMPOSE_PROJECT_NAME}:/data
-    restart: unless-stopped
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}:/data
     networks:
       - exposed
-      - proxy
     environment:
       DOZZLE_ENABLE_ACTIONS: ${DOZZLE_ACTIONS_ENABLE:-true}
       DOZZLE_HOSTNAME: ${MACHINE_DOMAIN}
       DOZZLE_NO_ANALYTICS: ${DOZZLE_ANALYTICS_DISABLE:-false}
     healthcheck:
       test: ["CMD", "/dozzle", "healthcheck"]
-      interval: 3s
-      timeout: 30s
-      retries: 5
-      start_period: 30s
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine domain is not defined}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=${AUTH_MIDDLEWARE:?Auth middleware is not defined}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8080"
 
 networks:

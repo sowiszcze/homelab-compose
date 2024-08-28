@@ -1,0 +1,17 @@
+name: go2rtc
+
+services:
+
+  app:
+    image: alexxit/go2rtc:${GO2RTC_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main
+    group_add:
+      - "${RENDER_GROUP:?Host render group ID missing}"
+    network_mode: host
+    privileged: true
+    environment:
+      - TZ=${TZ}
+    volumes:
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/config

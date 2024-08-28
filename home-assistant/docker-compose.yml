@@ -1,52 +1,21 @@
-version: '3.9'
-name: home-assistant
-# Home Assistant stack
-
-# Home Assistant
-#
-# Page: https://www.home-assistant.io/
-# Repo: https://github.com/home-assistant/core
-# Dckr: https://github.com/home-assistant/core/pkgs/container/home-assistant
-# Cmps: https://www.home-assistant.io/installation/alternative#docker-compose
-#
-# Open source home automation that puts local control and privacy first. Powered
-# by a worldwide community of tinkerers and DIY enthusiasts. Perfect to run on a
-# Raspberry Pi or a local server.
+name: homeassistant
 
 services:
 
-  home-assistant:
-    container_name: ${COMPOSE_PROJECT_NAME}
-    image: ghcr.io/home-assistant/home-assistant:${HASS_TAG:-stable}
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:${HOMEASSISTANT_TAG:-stable}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-hc
     volumes:
-      - /etc/${COMPOSE_PROJECT_NAME}:/config
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/config
       - /etc/localtime:/etc/localtime:ro
-        # Following, alongside with 'privileged: true' and 'network_mode: host' are
-        # required to use Bluetooth adapters inside the container. Further reading:
-        # - https://www.home-assistant.io/integrations/bluetooth/#additional-details-for-container-core-and-supervised-installs
-        # - https://community.home-assistant.io/t/bluetooth-and-docker-part-2/447334
-        # - https://stackoverflow.com/questions/28868393/accessing-bluetooth-dongle-from-inside-docker
       - /run/dbus:/run/dbus:ro
       - /var/run/dbus:/var/run/dbus:ro
       - /run/udev:/run/udev:ro
     devices:
-      - /dev/serial/by-id/${ZIGBEE_ID:?Zigbee coordinator ID missing}:/dev/ttyACM0
-    restart: unless-stopped
+      - /dev/serial/by-id/${ZIGBEE_DEV_ID:?Zigbee device ID missing}:/dev/ttyACM0
     privileged: true
     network_mode: host
     healthcheck:
       test: "curl -f http://localhost:8123/ || exit 1"
-    labels:
-      - "traefik.enable=true"
-
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${NETWORK_DOMAIN:?Netowrk domain is not defined}`) || Host(`ha.${NETWORK_DOMAIN}`) || Host(`hass.${NETWORK_DOMAIN}`) || Host(`${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine domain is not defined}`) || Host(`ha.${MACHINE_DOMAIN}`) || Host(`hass.${MACHINE_DOMAIN}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=${COMPOSE_PROJECT_NAME}Headers"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
-      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8123"
-      - "traefik.http.middlewares.${COMPOSE_PROJECT_NAME}Headers.headers.customrequestheaders.Connection=Upgrade"
-# In case of issues with jemalloc
-#    environment:
-#      - DISABLE_JEMALLOC: true

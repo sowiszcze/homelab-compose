@@ -3,28 +3,22 @@ name: actual
 services:
 
   actual:
-    container_name: ${COMPOSE_PROJECT_NAME}
     image: actualbudget/actual-server:${ACTUAL_TAG:-latest}
-    restart: unless-stopped
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb-hc
     healthcheck:
       test: 'cat /proc/net/tcp6 /proc/net/tcp | grep -iEsqe "^[ \0A-F]+: 0+:`printf \"%x\" 5006` [\0A-F:]+ 0A "'
-      interval: 10s
-      timeout: 1s
-      retries: 3
-      start_period: 30s
-      start_interval: 2s
     volumes:
-      - /srv/${COMPOSE_PROJECT_NAME}:/data
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}:/data
+    environment:
+      ACTUAL_LOGIN_METHOD: header
+      ACTUAL_TRUSTED_PROXIES: "[10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, fc00::/7, ::1/128]"
     networks:
-      - proxy
       - exposed
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.middlewares.${COMPOSE_PROJECT_NAME}-headers.headers.customrequestheaders.X-Forwarded-For="
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=${AUTH_MIDDLEWARE:?Auth middleware is not defined},${COMPOSE_PROJECT_NAME}-headers"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=5006"
 
 networks:

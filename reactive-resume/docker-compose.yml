@@ -1,42 +1,29 @@
-version: '3.9'
 name: reactive-resume
-# Reactive Resume stack
-
-# Reactive Resume
-#
-# Page: https://rxresu.me/
-# Code: https://github.com/AmruthPillai/Reactive-Resume/
-# Dckr: https://hub.docker.com/r/amruthpillai/reactive-resume
-# Cmps: https://github.com/AmruthPillai/Reactive-Resume/blob/main/tools/compose/traefik-secure.yml
-#
-# A free and open-source resume builder that simplifies the process of creating,
-# updating, and sharing your resume. With zero user tracking or advertising,
-# your privacy is a top priority. The platform is extremely user-friendly and
-# can be self-hosted in less than 30 seconds if you wish to own your data
-# completely.
 
 services:
 
-  postgres: # Database
-    container_name: ${COMPOSE_PROJECT_NAME}-postgres
-    image: postgres:${RR_POSTGRES_TAG:-15-alpine}
+  reactive-resume-db:
+    container_name: ${COMPOSE_PROJECT_NAME}-db
+    image: postgres:${RR_DB_VERSION:-15-alpine}
     restart: unless-stopped
     networks:
       - default
     volumes:
       - /srv/${COMPOSE_PROJECT_NAME}/db:/var/lib/postgresql/data
     environment:
-      POSTGRES_USER: ${RR_POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${RR_POSTGRES_PASSWORD:-postgres}
-      POSTGRES_DB: ${RR_POSTGRES_DB:-postgres}
+      POSTGRES_USER: ${RR_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${RR_POSTGRES_PASS:-postgres}
+      POSTGRES_DB: ${RR_DB_NAME:-postgres}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_PASSWORD"]
 
-  chrome: # Printing and previews
+  reactive-resume-chrome:
     container_name: ${COMPOSE_PROJECT_NAME}-chrome
-    image: browserless/chrome:${RR_CHROME_TAG:-1.61.0-puppeteer-21.4.1}
+    image: ghcr.io/browserless/chromium:${RR_CHROME_VERSION:-latest}
     restart: unless-stopped
     environment:
+      TIMEOUT: ${RR_CHROME_TIMEOUT:-10000}
+      CONCURRENT: ${RR_CHROME_CONCURRENT:-10}
       TOKEN: ${RR_CHROME_TOKEN:-chrome_token}
       EXIT_ON_HEALTH_FAILURE: true
       PRE_REQUEST_HEALTH_CHECK: true
@@ -46,18 +33,22 @@ services:
       - proxy
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-chrome.rule=Host(`printer.${COMPOSE_DOMAIN}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-chrome.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-chrome.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-chrome.rule=Host(`${COMPOSE_PROJECT_NAME}-printer.${COMPOSE_DOMAIN}`)"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-chrome.service=${COMPOSE_PROJECT_NAME}-chrome"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-chrome.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}-chrome.loadbalancer.server.port=3000"
 
-  redis: # Cache & server session management
-    container_name: ${COMPOSE_PROJECT_NAME}-redis
-    image: redis:${RR_REDIS_TAG:-alpine}
+  reactive-resume-kv:
+    container_name: ${COMPOSE_PROJECT_NAME}-kv
+    image: valkey/valkey:${RR_KV_VERSION:-alpine}
     restart: unless-stopped
-    command: redis-server --save 60 1 --loglevel warning --requirepass ${RR_REDIS_PASSWORD:-password}
+    command: "--save 60 1 --loglevel warning --requirepass ${RR_KV_PASSWORD:-password}"
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli -a '${RR_KV_PASSWORD:-password}' ping | grep PONG"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 3s
     networks:
       - default
     volumes:
@@ -65,52 +56,65 @@ services:
 
   reactive-resume:
     container_name: ${COMPOSE_PROJECT_NAME}
-    image: amruthpillai/reactive-resume:${REACTIVE_RESUME_TAG:-latest}
+    image: amruthpillai/reactive-resume:${REACTIVE_RESUME_VERSION:-latest}
     restart: unless-stopped
     depends_on:
-      - postgres
-      - redis
-      - chrome
+      reactive-resume-db:
+        condition: service_healthy
+      reactive-resume-kv:
+        condition: service_healthy
+      reactive-resume-chrome:
+        condition: service_started
     networks:
       - default
       - exposed
       - proxy
+      - smtp
+      - s3
     environment:
-      PUBLIC_URL: https://${RESUME_FQDN:?FQDN missing}
+      PORT: 3000
+      NODE_ENV: production
+      PUBLIC_URL: https://${RR_DOMAIN:-${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}}
       STORAGE_URL: ${RR_STORAGE_URL:?Missing storage URL}
       CHROME_TOKEN: ${RR_CHROME_TOKEN:-chrome_token}
-      CHROME_URL: wss://printer.${COMPOSE_DOMAIN}
-      DATABASE_URL: postgresql://${RR_POSTGRES_USER:-postgres}:${RR_POSTGRES_PASSWORD:-postgres}@postgres:5432/${RR_POSTGRES_DB:-postgres}
+      CHROME_URL: ws://${COMPOSE_PROJECT_NAME}-chrome:3000
+      DATABASE_URL: postgresql://${RR_DB_USER:-postgres}:${RR_DB_PASS:-postgres}@${COMPOSE_PROJECT_NAME}-db:5432/${RR_DB_NAME:-postgres}
       ACCESS_TOKEN_SECRET: ${RR_ACCESS_TOKEN_SECRET:-access_token_secret}
       REFRESH_TOKEN_SECRET: ${RR_REFRESH_TOKEN_SECRET:-refresh_token_secret}
-      MAIL_FROM: ${COMPOSE_PROJECT_NAME}@${RR_SMTP_ADDR:?SMTP address missing}
-      SMTP_URL: smtp://${RR_SMTP_USER}:${RR_SMTP_PASS}@${RR_SMTP_ADDR}:${RR_SMTP_PORT:-587}
+      MAIL_FROM: ${RR_MAIL_FROM:?Mail from address has to be set}
+      SMTP_URL: ${RR_MAIL_SMTP:?SMTP URL has to be set}
       STORAGE_ENDPOINT: ${RR_STORAGE_ENDPOINT:?Missing storage endpoint}
-      STORAGE_PORT: ${RR_STORAGE_PORT}
+      STORAGE_PORT: ${RR_STORAGE_PORT:-443}
       STORAGE_REGION: ${RR_STORAGE_REGION:?Missing storage region}
-      STORAGE_BUCKET: ${RR_STORAGE_BUCKET:?Missing storage bucket}
+      STORAGE_BUCKET: ${RR_STORAGE_BUCKET:-${COMPOSE_PROJECT_NAME}}
       STORAGE_ACCESS_KEY: ${RR_STORAGE_ACCESS_KEY:?Missing storage access key}
       STORAGE_SECRET_KEY: ${RR_STORAGE_SECRET_KEY:?Missing storage secret key}
       STORAGE_USE_SSL: ${RR_STORAGE_USE_SSL:-true}
-      REDIS_URL: redis://default:${RR_REDIS_PASSWORD}@redis:6379
+      REDIS_URL: redis://default:${RR_KV_PASSWORD}@${COMPOSE_PROJECT_NAME}-kv:6379
+      DISABLE_EMAIL_AUTH: ${RR_DISABLE_EMAIL:-true}
+      VITE_DISABLE_SIGNUPS: ${RR_DISABLE_SIGNUPS:-true}
       GITHUB_CLIENT_ID: ${RR_GITHUB_CLIENT_ID:?GitHub client ID missing}
       GITHUB_CLIENT_SECRET: ${RR_GITHUB_CLIENT_SECRET:?GitHub client secret missing}
-      GITHUB_CALLBACK_URL: https://${RESUME_FQDN}/api/auth/github/callback
+      GITHUB_CALLBACK_URL: https://${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}/api/auth/github/callback
       GOOGLE_CLIENT_ID: ${RR_GOOGLE_CLIENT_ID:?Google client ID missing}
       GOOGLE_CLIENT_SECRET: ${RR_GOOGLE_CLIENT_SECRET:?Google client secret mising}
-      GOOGLE_CALLBACK_URL: https://${RESUME_FQDN}/api/auth/google/callback
+      GOOGLE_CALLBACK_URL: https://${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}/api/auth/google/callback
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${RESUME_FQDN}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=${RR_DOMAIN:+Host(`}${RR_DOMAIN}${RR_DOMAIN:+`) || }Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose domain is not defined}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=cors-allow-all@file"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=3000"
 
 networks:
   default:
+    internal: true
   proxy:
     external: true
   exposed:
+    external: true
+  smtp:
+    external: true
+  s3:
     external: true

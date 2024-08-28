@@ -1,0 +1,21 @@
+name: prowlarr
+
+services:
+
+  prowlarr:
+    image: ghcr.io/hotio/prowlarr:${PROWLARR_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-hotio-arr
+    volumes:
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/config
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=9696"
+
+networks:
+  exposed:
+    external: true
+  proxy:
+    external: true
+  multimedia:
+    external: true

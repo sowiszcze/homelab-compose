@@ -4,27 +4,21 @@ services:
 
   sabnzbd:
     image: lscr.io/linuxserver/sabnzbd:${SABNZBD_TAG:-latest}
-    container_name: ${COMPOSE_PROJECT_NAME}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
     environment:
       - PUID=${UID:-1000}
       - PGID=${GID:-1000}
       - TZ=${TZ:-Etc/UTC}
     networks:
       - exposed
-      - proxy
       - multimedia
     volumes:
-      - /etc/${COMPOSE_PROJECT_NAME}:/config
-      - /cabinet/download:/downloads
-      - /cabinet/incomplete-download:/incomplete-downloads
-    restart: unless-stopped
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/config
+      - ${SABNZBD_DL_DIR:?No download directory set}:/downloads
+      - ${SABNZBD_INCOMPLETE_DL_DIR:?No directory set for incomplete downloads}:/incomplete-downloads
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${NETWORK_DOMAIN:?Netowrk domain is not defined}`, `${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine domain is not defined}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8080"
 
 networks:

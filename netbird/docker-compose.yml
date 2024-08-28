@@ -1,0 +1,105 @@
+name: netbird
+
+services:
+
+  netbird-dashboard:
+    image: netbirdio/dashboard:${NETBIRD_DASHBOARD_TAG:-latest}
+    container_name: ${COMPOSE_PROJECT_NAME}-dashboard
+    restart: unless-stopped
+    environment:
+      # Endpoints
+      - NETBIRD_MGMT_API_ENDPOINT=https://${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}:443
+      - NETBIRD_MGMT_GRPC_API_ENDPOINT=https://${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}:443
+      # OIDC
+      - AUTH_AUDIENCE=${NETBIRD_OIDC_CLIENT}
+      - AUTH_CLIENT_ID=${NETBIRD_OIDC_CLIENT}
+      - AUTH_CLIENT_SECRET=
+      - AUTH_AUTHORITY=https://auth.${COMPOSE_DOMAIN}/application/o/${COMPOSE_PROJECT_NAME}/
+      - USE_AUTH0=false
+      - AUTH_SUPPORTED_SCOPES=openid profile email offline_access api
+      - AUTH_REDIRECT_URI=
+      - AUTH_SILENT_REDIRECT_URI=
+      - NETBIRD_TOKEN_SOURCE=accessToken
+      # SSL
+      - NGINX_SSL_PORT=443
+      # Letsencrypt
+      - LETSENCRYPT_DOMAIN=
+      - LETSENCRYPT_EMAIL=
+    networks:
+      - default
+      - proxy
+      - exposed
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-dashboard.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose domain has to be set}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-dashboard.service=${COMPOSE_PROJECT_NAME}-dashboard"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-dashboard.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}-dashboard.loadbalancer.server.port=80"
+
+  netbird-signal:
+    image: netbirdio/signal:${NETBIRD_SIGNAL_TAG:-latest}
+    container_name: ${COMPOSE_PROJECT_NAME}-signal
+    restart: unless-stopped
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/signal:/var/lib/netbird
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-signal.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}`) && PathPrefix(`/signalexchange.SignalExchange/`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-signal.service=${COMPOSE_PROJECT_NAME}-signal"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-signal.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}-signal.loadbalancer.server.port=80"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}-signal.loadbalancer.server.scheme=h2c"
+
+  netbird-management:
+    image: netbirdio/management:${NETBIRD_MANAGEMENT_TAG:-latest}
+    container_name: ${COMPOSE_PROJECT_NAME}-management
+    restart: unless-stopped
+    depends_on:
+      - netbird-dashboard
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/management:/var/lib/netbird
+      - /etc/${COMPOSE_PROJECT_NAME}/management.json:/etc/netbird/management.json
+    command: [
+      "--port", "443",
+      "--log-file", "console",
+      "--log-level", "info",
+      "--disable-anonymous-metrics=false",
+      "--single-account-mode-domain=${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}",
+      "--dns-domain=${NETBIRD_ROAMING_DOMAIN:-${NETBIRD_ROAMING_SUBDOMAIN:-$COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}}"
+      ]
+    networks:
+      - default
+      - proxy
+      - exposed
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-api.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-api.service=${COMPOSE_PROJECT_NAME}-api"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-api.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}-api.loadbalancer.server.port=443"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-management.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}`) && PathPrefix(`/management.ManagementService/`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-management.service=${COMPOSE_PROJECT_NAME}-management"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-management.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}-management.loadbalancer.server.port=443"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}-management.loadbalancer.server.scheme=h2c"
+
+  netbird-coturn:
+    image: coturn/coturn:${NETBIRD_COTURN_TAG:-latest}
+    container_name: ${COMPOSE_PROJECT_NAME}-coturn
+    domainname: turn.${COMPOSE_DOMAIN}
+    restart: unless-stopped
+    volumes:
+      - /etc/netbird/turnserver.conf:/etc/turnserver.conf:ro
+    network_mode: host
+    command:
+      - -c /etc/turnserver.conf
+
+networks:
+  default:
+    internal: true
+  proxy:
+    external: true
+  exposed:
+    external: true

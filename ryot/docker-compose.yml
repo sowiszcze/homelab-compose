@@ -1,0 +1,53 @@
+name: ryot
+
+services:
+
+  ryot:
+    container_name: ${COMPOSE_PROJECT_NAME}
+    image: ghcr.io/ignisda/ryot:${RYOT_TAG:-latest}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgres://${COMPOSE_PROJECT_NAME}:${RYOT_DB_PASS:-${COMPOSE_PROJECT_NAME}}@${COMPOSE_PROJECT_NAME}-db:5432/${COMPOSE_PROJECT_NAME}
+      - FRONTEND_URL=https://${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}
+      - SERVER_OIDC_CLIENT_ID
+      - SERVER_OIDC_CLIENT_SECRET
+      - SERVER_OIDC_ISSUER_URL
+    restart: unless-stopped
+    networks:
+      - default
+      - proxy
+      - exposed
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose domain is not defined}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8000"
+
+  postgres:
+    container_name: ${COMPOSE_PROJECT_NAME}-db
+    image: postgres:${RYOT_DB_TAG:-16-alpine}
+    restart: unless-stopped
+    networks:
+      - default
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "$POSTGRES_USER"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/db:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=${RYOT_DB_PASS:-${COMPOSE_PROJECT_NAME}}
+      - POSTGRES_USER=${COMPOSE_PROJECT_NAME}
+      - POSTGRES_DB=${COMPOSE_PROJECT_NAME}
+
+networks:
+  default:
+    internal: true
+  proxy:
+    external: true
+  exposed:
+    external: true

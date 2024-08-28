@@ -4,10 +4,11 @@ services:
 
   music-assistant:
     image: ghcr.io/music-assistant/server:${MASS_TAG:-latest}
-    container_name: ${COMPOSE_PROJECT_NAME}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main
     volumes:
-      - /srv/${COMPOSE_PROJECT_NAME}:/data
-      - /stockpile/music:/music
-    restart: unless-stopped
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}:/data
+      - ${MUSIC_DIR:?Directory for music library has to be set}:/music
     network_mode: host
     privileged: true

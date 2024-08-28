@@ -1,31 +1,20 @@
-version: '3.9'
 name: ghost
-# Ghost stack
-
-# Ghost
-#
-# Page: https://ghost.org/
-# Repo: https://github.com/tryghost/ghost
-# Dckr: https://hub.docker.com/_/ghost/
-# Cmps: https://github.com/docker-library/docs/tree/master/ghost#-via-docker-compose-or-docker-stack-deploy
-#
-# Independent technology for modern publishing, memberships, subscriptions and
-# newsletters.
 
 services:
 
   ghost:
-    container_name: ${COMPOSE_PROJECT_NAME}
-    image: ghost:${GHOST_VERSION:-5-alpine}
-    restart: unless-stopped
+    image: ghost:${GHOST_VERSION:-alpine}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
     environment:
       # see https://ghost.org/docs/config/#configuration-options
-      url: https://${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}
+      url: https://${DOMAIN_OVERRIDE:-${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}}
       database__client: ${GHOST_DB_ENGINE:-mysql}
-      database__connection__host: ${GHOST_DB_HOST:-db}
-      database__connection__user: ${GHOST_DB_USER:-root}
-      database__connection__password: ${GHOST_DB_PASS:?Database password has to be set}
-      database__connection__database: ${GHOST_DB_NAME:-ghost}
+      database__connection__host: ${DB_HOST:-${COMPOSE_PROJECT_NAME}-db}
+      database__connection__user: ${DB_USER:-root}
+      database__connection__password: ${DB_PASS:?Database password has to be set}
+      database__connection__database: ${DB_NAME:-${COMPOSE_PROJECT_NAME}}
       mail__from: ${GHOST_MAIL_FROM:-support@example.com}
       mail__transport: ${GHOST_MAIL_TRANSPORT:-SMTP}
       mail__options__service: ${GHOST_MAIL_SERVICE}
@@ -35,35 +24,36 @@ services:
       mail__options__auth__user: ${GHOST_MAIL_USER}
       mail__options__auth__pass: ${GHOST_MAIL_PASS}
     volumes:
-      - /srv/${COMPOSE_PROJECT_NAME}/content:/var/lib/ghost/content
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}/content:/var/lib/ghost/content
     networks:
       - default
+      - exposed
       - proxy
       - smtp
     depends_on:
-      - db
+      mysql:
+        condition: service_started
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=2368"
 
-  db:
+  mysql:
     container_name: ${COMPOSE_PROJECT_NAME}-db
     image: mysql:${GHOST_DB_VERSION:-8.0}
-    restart: unless-stopped
+    extends:
+      file: ../fragments/services.yml
+      service: service-sub
     environment:
-      MYSQL_ROOT_PASSWORD: ${GHOST_DB_PASS}
+      MYSQL_ROOT_PASSWORD: ${DB_PASS}
     volumes:
-      - /srv/${COMPOSE_PROJECT_NAME}/db:/var/lib/mysql
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}/db:/var/lib/mysql
     networks:
       - default
 
 networks:
   default:
+    internal: true
+  exposed:
+    external: true
   proxy:
     external: true
   smtp:

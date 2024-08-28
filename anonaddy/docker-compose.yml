@@ -6,9 +6,9 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME}
     image: anonaddy/anonaddy:${ANONADDY_TAG:-latest}
     depends_on:
-      db:
+      mariadb:
         condition: service_healthy
-      redis:
+      valkey:
         condition: service_healthy
     restart: unless-stopped
     volumes:
@@ -16,11 +16,11 @@ services:
       - /etc/letsencrypt:/etc/letsencrypt:ro
     env_file: stack.env
     environment:
-      - DB_HOST=db
+      - DB_HOST=${COMPOSE_PROJECT_NAME}-db
       - DB_DATABASE=${MYSQL_DATABASE}
       - DB_USERNAME=${MYSQL_USER}
       - DB_PASSWORD=${MYSQL_PASSWORD}
-      - REDIS_HOST=redis
+      - REDIS_HOST=${COMPOSE_PROJECT_NAME}-kv
     ports:
       - 25:25/tcp
     networks:
@@ -30,15 +30,11 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8000"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-rspamd.rule=Host(`${COMPOSE_PROJECT_NAME}-rspamd.${COMPOSE_DOMAIN}`)"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-rspamd.middlewares=${AUTH_MIDDLEWARE:?Auth middleware is not defined}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-rspamd.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-rspamd.tls.certresolver=${CERT_RESOLVER}"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-rspamd.service=${COMPOSE_PROJECT_NAME}-rspamd"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-rspamd.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}-rspamd.loadbalancer.server.port=11334"
@@ -55,14 +51,12 @@ services:
     restart: unless-stopped
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-nginx.rule=(Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}`) || Host(`${MTA_STS_DOMAINS:-mta-sts.${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}}`)) && PathPrefix(`/.well-known`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-nginx.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-nginx.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-nginx.rule=(Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}`) || ${MTA_STS_HOSTS:-Host(`mta-sts.${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}`)}) && PathPrefix(`/.well-known`)"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-nginx.service=${COMPOSE_PROJECT_NAME}-nginx"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-nginx.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}-nginx.loadbalancer.server.port=80"
 
-  db:
+  mariadb:
     image: mariadb:${ANONADDY_MARIA_TAG:-10.5}
     container_name: ${COMPOSE_PROJECT_NAME}-db
     command:
@@ -71,7 +65,7 @@ services:
       - "--collation-server=utf8mb4_unicode_ci"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", 'mysqladmin', 'ping', '-h', 'localhost', '-u', '$$MYSQL_USER', '-p$$MYSQL_PASSWORD' ]
+      test: ["CMD", 'mysqladmin', 'ping', '-h', 'localhost', '-u', '$MYSQL_USER', '-p$MYSQL_PASSWORD' ]
       interval: 10s
       timeout: 1s
       retries: 3
@@ -87,12 +81,12 @@ services:
     networks:
       - default
 
-  redis:
-    image: redis:${ANONADDY_REDIS_TAG:-4.0-alpine}
-    container_name: ${COMPOSE_PROJECT_NAME}-redis
+  valkey:
+    image: valkey/valkey:${ANONADDY_VALKEY_TAG:-alpine}
+    container_name: ${COMPOSE_PROJECT_NAME}-kv
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
+      test: ["CMD-SHELL", "valkey-cli ping | grep PONG"]
       interval: 10s
       timeout: 1s
       retries: 3

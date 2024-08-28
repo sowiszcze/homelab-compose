@@ -1,0 +1,18 @@
+name: doku
+
+services:
+
+  doku:
+    image: amerkurev/doku:${DOKU_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-loc-hc
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /:/hostroot:ro
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=9090"
+
+networks:
+  proxy:
+    external: true

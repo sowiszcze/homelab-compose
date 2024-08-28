@@ -7,13 +7,15 @@ services:
     image: monica:${MONICA_TAG:-latest}
     restart: unless-stopped
     depends_on:
-      - monica-db
-      - monica-kv
+      monica-db:
+        condition: service_healthy
+      monica-kv:
+        condition: service_healthy
     environment:
       APP_ENV: production
       APP_KEY: ${MONICA_KEY:?Application key is missing}
       DB_CONNECTION: mysql
-      DB_HOST: ${COMPOSE_PROJECT_NAME}-db
+      DB_HOST: monica-db
       DB_PORT: 3306
       DB_DATABASE: ${MONICA_DB_NAME:-monica}
       DB_USERNAME: ${MONICA_DB_USER:-monica}
@@ -29,13 +31,8 @@ services:
       CHECK_VERSION: false
       CACHE_DRIVER: redis
       SESSION_DRIVER: redis
-      REDIS_HOST: ${COMPOSE_PROJECT_NAME}-kv
-      FILESYSTEM_DISK: s3
-      AWS_KEY: ${MONICA_S3_KEY:?S3 storage key not present}
-      AWS_SECRET: ${MONICA_S3_SECRET:?S3 storage secret not present}
-      AWS_REGION: none
-      AWS_BUCKET: ${MONICA_S3_BUCKET:-COMPOSE_PROJECT_NAME}
-      AWS_SERVER: ${MONICA_S3_SERVER:-minio}
+      REDIS_HOST: monica-kv
+      FILESYSTEM_DISK: public
     volumes:
       - /srv/${COMPOSE_PROJECT_NAME}/data:/var/www/html/storage
     networks:
@@ -63,13 +60,26 @@ services:
     volumes:
       - /srv/${COMPOSE_PROJECT_NAME}/db:/var/lib/mysql
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 1s
+      retries: 3
+      start_period: 30s
+      start_interval: 2s
     networks:
       - default
 
   monica-kv:
     container_name: ${COMPOSE_PROJECT_NAME}-kv
-    image: registry.redict.io/redict:${MONICA_KV_TAG:-latest}
+    image: valkey/valkey:${MONICA_KV_TAG:-alpine}
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli ping | grep PONG"]
+      start_period: 20s
+      interval: 30s
+      retries: 5
+      timeout: 3s
 
 networks:
   default:

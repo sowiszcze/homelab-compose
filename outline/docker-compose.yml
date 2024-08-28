@@ -3,62 +3,35 @@ name: outline
 services:
 
   outline:
-    container_name: ${COMPOSE_PROJECT_NAME}
     image: docker.getoutline.com/outlinewiki/outline:${OUTLINE_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
     volumes:
-      - /srv/${COMPOSE_PROJECT_NAME}/data:/var/lib/outline/data
-    restart: unless-stopped
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}/data:/var/lib/outline/data
     env_file: stack.env
     depends_on:
-      - ${COMPOSE_PROJECT_NAME}-db
-      - ${COMPOSE_PROJECT_NAME}-kv
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
     networks:
       - default
       - exposed
       - proxy
       - smtp
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Netowrk domain is not defined}`) || Host(`${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine domain is not defined}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.tls.certresolver=${CERT_RESOLVER:?Cert resolver name missing}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=3000"
 
-  outline-db:
-    container_name: ${COMPOSE_PROJECT_NAME}-db
-    image: postgres:${OUTLINE_POSTGRES_TAG:-15-alpine}
-    restart: unless-stopped
-    env_file: stack.env
-    environment:
-      POSTGRES_USER: "${OUTLINE_PGSQL_USER:-outline}"
-      POSTGRES_PASSWORD: "${OUTLINE_PGSQL_PASS:?Password for Postgres database is missing}"
-      POSTGRES_DB: "${OUTLINE_PGSQL_NAME:-outline}"
-    networks:
-      - default
-    volumes:
-      - /srv/${COMPOSE_PROJECT_NAME}/db:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD", "pg_isready", "-d", "outline", "-U", "user"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
+  postgres:
+    extends:
+      file: ../fragments/services.yml
+      service: postgres
 
-  outline-kv:
-    container_name: ${COMPOSE_PROJECT_NAME}-kv
-    image: registry.redict.io/redict:${OUTLINE_REDICT_TAG:-latest}
-    restart: unless-stopped
-    command: /etc/redict.conf
-    networks:
-      - default
-    volumes:
-      - /etc/${COMPOSE_PROJECT_NAME}/redict.conf:/etc/redict.conf
-    healthcheck:
-      test: ["CMD", "redict-cli", "ping"]
-      interval: 10s
-      timeout: 30s
-      retries: 3
+  valkey:
+    extends:
+      file: ../fragments/services.yml
+      service: valkey-ephemeral
 
 networks:
   default:

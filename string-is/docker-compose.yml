@@ -2,7 +2,7 @@ name: string-is
 
 services:
 
-  linkding:
+  string-is:
     container_name: ${COMPOSE_PROJECT_NAME}
     image: daveperrett/string-is:${STRINGIS_TAG:-latest}
     restart: unless-stopped

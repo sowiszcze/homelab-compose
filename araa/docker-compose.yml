@@ -1,0 +1,40 @@
+name: araa
+
+services:
+
+  araa:
+    image: docker.io/temthelem/araa-search:${ARAA_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
+    environment:
+      PORT: 8000
+      WORKERS: 8
+      THREADS: 2
+      SHEBANG: "!"
+      DEFAULT_THEME: dark_blur
+      DEFAULT_METHOD: GET
+      DOMAIN: ${DOMAIN_OVERRIDE:-${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}}
+      DONATE_URL:
+      ENABLE_API: "True"
+      DEFAULT_LANG: english
+      #PIPED_INSTANCE:
+      #PIPED_API:
+      #PIPED_PROXY:
+      ENABLE_TORRENTS: "True"
+      TORRENT_SITES: "[ 'nyaa', 'torrentgalaxy', 'tpb', 'rutor' ]"
+      TORRENTGALAXY_DOMAIN: torrentgalaxy.to
+      NYAA_DOMAIN: nyaa.si
+      APIBAY_DOMAIN: apibay.org
+      RUTOR_DOMAIN: rutor.info
+    networks:
+      - exposed
+    labels:
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=${AUTH_MIDDLEWARE:?Auth middleware is not defined}"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8000"
+
+networks:
+  proxy:
+    external: true
+  exposed:
+    external: true
