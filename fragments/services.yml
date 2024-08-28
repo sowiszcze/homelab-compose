@@ -1,0 +1,130 @@
+x-settings:
+
+  labels:
+    - &version "tech.sowi.homelab.fragments.version=0.3"
+    - &traefik "traefik.enable=true"
+    - &traefik-svc "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
+    - &traefik-entry "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
+    - &traefik-rule-glb "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=${DOMAIN_OVERRIDE:+Host(`${DOMAIN_OVERRIDE}`) || }Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
+    - &traefik-rule-loc "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=${DOMAIN_OVERRIDE:+Host(`${DOMAIN_OVERRIDE}`) || }Host(`${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine FQDN missing}`)"
+
+  healthcheck: &healthcheck-base
+    start_interval: 1s
+    start_period: 60s
+    interval: 15s
+    retries: 3
+    timeout: 5s
+
+
+
+services:
+
+  stub-healthcheck:
+    healthcheck: *healthcheck-base
+
+  service: &svc
+    restart: unless-stopped
+    labels:
+      - *version
+
+  service-main: &svc-main
+    <<: *svc
+    container_name: ${COMPOSE_PROJECT_NAME}
+
+  service-main-hc:
+    <<: *svc-main
+    healthcheck: *healthcheck-base
+
+  service-main-web: &svc-main-web
+    <<: *svc-main
+    networks:
+      - proxy
+
+  service-main-web-glb: &svc-main-web-glb
+    <<: *svc-main-web
+    labels:
+      - *version
+      - *traefik
+      - *traefik-svc
+      - *traefik-entry
+      - *traefik-rule-glb
+
+  service-main-web-glb-hc:
+    <<: *svc-main-web-glb
+    healthcheck: *healthcheck-base
+
+  service-main-web-loc: &svc-main-web-loc
+    <<: *svc-main-web
+    labels:
+      - *version
+      - *traefik
+      - *traefik-svc
+      - *traefik-entry
+      - *traefik-rule-loc
+
+  service-main-web-loc-hc:
+    <<: *svc-main-web-loc
+    healthcheck: *healthcheck-base
+
+  service-hotio-arr:
+    <<: *svc-main-web-glb
+    environment:
+      - PUID=${UID:-1000}
+      - PGID=${GID:-1000}
+      - TZ=${TZ:-Etc/UTC}
+    networks:
+      - proxy
+      - exposed
+      - multimedia
+
+  service-sub: &svc-sub
+    <<: *svc
+    networks:
+      - default
+
+  service-sub-hc: &svc-sub-hc
+    <<: *svc-sub
+    healthcheck: *healthcheck-base
+
+  valkey: &valkey
+    <<: *svc-sub-hc
+    container_name: ${COMPOSE_PROJECT_NAME}-kv
+    image: valkey/valkey:${VALKEY_TAG:-alpine}
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli ping | grep -qi PONG"]
+
+  valkey-persistent:
+    <<: *valkey
+    command: "--save 60 1 --loglevel warning"
+    volumes:
+      - /srv/${COMPOSE_PROJECT_NAME}/kv:/data:Z
+
+  valkey-ephemeral:
+    <<: *valkey
+    command: "--loglevel warning"
+
+  postgres:
+    <<: *svc-sub-hc
+    container_name: ${COMPOSE_PROJECT_NAME}-db
+    image: postgres:${POSTGRES_TAG:-alpine}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+    volumes:
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}/db:/var/lib/postgresql/data:Z
+    environment:
+      POSTGRES_DB: ${DB_NAME:-${COMPOSE_PROJECT_NAME}}
+      POSTGRES_USER: ${DB_USER:-${COMPOSE_PROJECT_NAME}}
+      POSTGRES_PASSWORD: ${DB_PASS}
+
+  mariadb:
+    <<: *svc-sub-hc
+    container_name: ${COMPOSE_PROJECT_NAME}-db
+    image: mariadb:${MARIADB_TAG:-latest}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+    volumes:
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}/db:/var/lib/mysql:Z
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-${COMPOSE_PROJECT_NAME}}
+      MYSQL_USER: ${DB_USER:-${COMPOSE_PROJECT_NAME}}
+      MYSQL_PASSWORD: ${DB_PASS}
