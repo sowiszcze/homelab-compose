@@ -1,0 +1,19 @@
+name: portall
+
+services:
+
+  dozzle:
+    image: need4swede/portall:${PORTALL_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-loc
+    volumes:
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}:/app/instance
+    environment:
+      SECRET_KEY: ${APP_KEY:?Application secret key has to be defined}
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8080"
+
+networks:
+  proxy:
+    external: true

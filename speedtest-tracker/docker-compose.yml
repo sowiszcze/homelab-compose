@@ -1,0 +1,53 @@
+name: speedtest-tracker
+
+services:
+
+  speedtest-tracker:
+    image: lscr.io/linuxserver/speedtest-tracker:${SPEEDTEST_TRACKER_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb-hc
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - APP_KEY=${SECRET}
+      - APP_URL=${DOMAIN_OVERRIDE:-${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}}
+      - APP_TIMEZONE=${TZ:-Etc/UTC}
+      - DB_CONNECTION=pgsql
+      - DB_HOST=${COMPOSE_PROJECT_NAME}-db
+      - DB_PORT=5432
+      - DB_DATABASE=${DB_NAME:-${COMPOSE_PROJECT_NAME}}
+      - DB_USERNAME=${DB_USER:-${COMPOSE_PROJECT_NAME}}
+      - DB_PASSWORD=${DB_PASS}
+      - PUBLIC_DASHBOARD=${PUBLIC:-false}
+      - SPEEDTEST_PING_URL
+      - SPEEDTEST_SCHEDULE="${SCHEDULE:-0 0 * * *}"
+      - SPEEDTEST_SERVERS=${SERVERS}
+    volumes:
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/config
+    healthcheck:
+      test: curl -fSs http://127.0.0.1/api/healthcheck | jq -r .message || exit 1
+    dns:
+      - 1.1.1.1
+      - 9.9.9.9
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - default
+      - exposed
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=80"
+
+  postgres:
+    extends:
+      file: ../fragments/services.yml
+      service: postgres
+
+networks:
+  default:
+    internal: true
+  exposed:
+    external: true
+  proxy:
+    external: true

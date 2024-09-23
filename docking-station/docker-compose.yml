@@ -1,0 +1,29 @@
+name: docking-station
+
+services:
+
+  docking-station:
+    image: loolzzz/docking-station:${DOCKINGSTATION_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-loc
+    volumes:
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/config
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}:/data
+      - ${PROJECT_LOGS_DIR:-${LOGS_DIR:-/var/log}/${COMPOSE_PROJECT_NAME}}:/logs
+      - ${COMPOSE_DIR:-/dev/null}:/mnt/compose-files
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/localtime:/etc/localtime:ro
+    networks:
+      - exposed
+    dns:
+      - 1.1.1.1
+      - 9.9.9.9
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=3000"
+
+networks:
+  exposed:
+    external: true
+  proxy:
+    external: true

@@ -1,0 +1,25 @@
+name: scrutiny
+
+services:
+
+  scrutiny:
+    image: ghcr.io/analogj/scrutiny:${SCRUNITY_TAG:-master-omnibus}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-loc
+    cap_add:
+      - SYS_RAWIO
+    devices: []
+    volumes:
+      - /run/udev:/run/udev:ro
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/opt/scrutiny/config
+      - ${PROJECT_DB_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/db}:/opt/scrutiny/influxdb
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8080"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-influx.rule=${INFLUX_DOMAIN_OVERRIDE:+Host(`${INFLUX_DOMAIN_OVERRIDE}`) || }Host(`${COMPOSE_PROJECT_NAME}-influx.${MACHINE_DOMAIN:?Machine FQDN missing}`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-influx.service=${COMPOSE_PROJECT_NAME}-influx"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}-influx.loadbalancer.server.port=8086"
+
+networks:
+  proxy:
+    external: true
