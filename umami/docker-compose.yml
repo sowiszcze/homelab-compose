@@ -1,0 +1,37 @@
+name: umami
+
+services:
+
+  umami:
+    image: ghcr.io/umami-software/umami:${UMAMI_TAG:-postgresql-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb-hc
+    healthcheck:
+      test: ["CMD-SHELL", "curl http://localhost:3000/api/heartbeat"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-${COMPOSE_PROJECT_NAME}}:${DB_PASS:?Database password is missing}@${COMPOSE_PROJECT_NAME}-db:5432/${DB_NAME:-${COMPOSE_PROJECT_NAME}}
+      DATABASE_TYPE: postgresql
+      APP_SECRET: ${SECRET:?App secret has to be defined}
+      CLIENT_IP_HEADER: X-Forwarded-For
+    networks:
+      - default
+      - exposed
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=3000"
+
+  postgres:
+    extends:
+      file: ../fragments/services.yml
+      service: postgres
+
+networks:
+  default:
+    internal: true
+  proxy:
+    external: true
+  exposed:
+    external: true
