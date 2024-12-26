@@ -1,0 +1,111 @@
+name: windmill
+
+services:
+
+  windmill-server:
+    image: ghcr.io/windmill-labs/windmill:${WINDMILL_TAG:-main}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
+    depends_on:
+      windmill-db:
+        condition: service_healthy
+    volumes:
+      - ${PROJECT_LOGS_DIR:-${LOGS_DIR:-/var/log}/${COMPOSE_PROJECT_NAME}}/server:/tmp/windmill/logs
+    ports:
+      - "2525:2525"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - MODE=server
+    networks:
+      - default
+      - exposed
+      - proxy
+      - smtp
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8000"
+
+  windmill-worker:
+    image: ghcr.io/windmill-labs/windmill:${WINDMILL_TAG:-main}
+    extends:
+      file: ../fragments/services.yml
+      service: service-sub
+    container_name: ${COMPOSE_PROJECT_NAME}-worker
+    networks:
+      - default
+      - exposed
+      - smtp
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - MODE=worker
+      - WORKER_GROUP=default
+    depends_on:
+      windmill-db:
+        condition: service_healthy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${PROJECT_LOGS_DIR:-${LOGS_DIR:-/var/log}/${COMPOSE_PROJECT_NAME}}/worker:/tmp/windmill/logs
+      - type: tmpfs # Optional: 1GB of memory
+        target: /tmp/windmill/cache
+        tmpfs:
+          size: 1000000000
+
+  windmill-worker-native:
+    image: ghcr.io/windmill-labs/windmill:${WINDMILL_TAG:-main}
+    extends:
+      file: ../fragments/services.yml
+      service: service-sub
+    container_name: ${COMPOSE_PROJECT_NAME}-worker-native
+    networks:
+      - default
+      - exposed
+      - smtp
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - MODE=worker
+      - WORKER_GROUP=native
+      - NUM_WORKERS=8
+      - SLEEP_QUEUE=200
+    depends_on:
+      windmill-db:
+        condition: service_healthy
+    volumes:
+      - ${PROJECT_LOGS_DIR:-${LOGS_DIR:-/var/log}/${COMPOSE_PROJECT_NAME}}/worker:/tmp/windmill/logs
+
+  windmill-lsp:
+    image: ghcr.io/windmill-labs/windmill-lsp:${WINDMILL_LSP_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-sub
+    container_name: ${COMPOSE_PROJECT_NAME}-lsp
+    networks:
+      - default
+      - exposed
+      - proxy
+      - smtp
+    volumes:
+      - type: tmpfs # Optional: 1GB of memory
+        target: /root/.cache
+        tmpfs:
+          size: 1000000000
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-lsp.rule=(${DOMAIN_OVERRIDE:+Host(`${DOMAIN_OVERRIDE}`) || }Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)) && PathPrefix(`/ws`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-lsp.service=${COMPOSE_PROJECT_NAME}-lsp"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-lsp.entrypoints=http,https"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}-lsp.loadbalancer.server.port=3001"
+
+  windmill-db:
+    extends:
+      file: ../fragments/services.yml
+      service: postgres
+
+networks:
+  deafault:
+    internal: true
+  exposed:
+    external: true
+  proxy:
+    external: true
+  smtp:
+    external: true
