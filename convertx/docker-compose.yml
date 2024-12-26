@@ -1,0 +1,28 @@
+name: convertx
+
+services:
+
+  convertx:
+    image: ghcr.io/c4illin/convertx:${CONVERTX_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
+    networks:
+      - exposed
+      - proxy
+    environment:
+      ACCOUNT_REGISTRATION: ${ALLOW_REGISTER:-false}
+      JWT_SECRET: ${SECRET:?JWT secret has to be defined}
+      HTTP_ALLOWED: ${INSECURE:-false}
+      ALLOW_UNAUTHENTICATED: ${OPEN:-false}
+    volumes:
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}:/app/data
+    labels:
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=${AUTH_MIDDLEWARE:?Auth middleware is not defined}"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=3000"
+
+networks:
+  exposed:
+    external: true
+  proxy:
+    external: true
