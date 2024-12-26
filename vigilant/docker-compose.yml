@@ -1,0 +1,68 @@
+name: vigilant
+
+services:
+
+  vigilant:
+    image: ghcr.io/govigilant/vigilant:${VIGILANT_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb-hc
+    working_dir: /app
+    healthcheck:
+      test: curl --fail http://localhost:8000 || exit 1
+    volumes:
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}/.env:/app/.env
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}:/app/storage
+      - ${PROJECT_PUBLIC_DIR:-${FILES_DIR:-/var}/${COMPOSE_PROJECT_NAME}}:/app/public
+    networks:
+      - default
+      - exposed
+    depends_on:
+      vigilant-db:
+        condition: service_healthy
+      vigilant-kv:
+        condition: service_healthy
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8000"
+
+  horizon:
+    image: ghcr.io/govigilant/vigilant:${VIGILANT_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-sub
+    healthcheck:
+      disable: true
+    container_name: ${COMPOSE_PROJECT_NAME}-horizon
+    volumes:
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}/.env:/app/.env
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}:/app/storage
+      - ${PROJECT_PUBLIC_DIR:-${FILES_DIR:-/var}/${COMPOSE_PROJECT_NAME}}:/app/public
+    working_dir: /app
+    networks:
+      - exposed
+    entrypoint: ["php", "artisan", "horizon"]
+    depends_on:
+      vigilant-db:
+        condition: service_healthy
+      vigilant-kv:
+        condition: service_healthy
+
+  vigilant-db:
+    extends:
+      file: ../fragments/services.yml
+      service: mariadb
+    environment:
+      MARIADB_ROOT_PASSWORD: ${DB_PASS}
+
+  vigilant-kv:
+    extends:
+      file: ../fragments/services.yml
+      service: valkey-ephemeral
+
+networks:
+  proxy:
+    external: true
+  exposed:
+    external: true
+  default:
+    internal: true
