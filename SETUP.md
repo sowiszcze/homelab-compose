@@ -65,18 +65,35 @@ Following set of Docker networks is used:
 
 - ``exposed`` for containers needing a connection to the Internet
 - ``mqtt`` for containers using [MQTT service](eclipse-mosquitto)
+- ``observability`` for containers exposing prometheus endpoint
 - ``proxy`` for containers exposing their services via [reverse proxy](traefik)
 - ``s3`` for containers using [S3 compatible object storage](minio)
 - ``smarthome`` for IoT and smarthome-related services that need to be connected
 - ``smtp`` for containers sending email through [SMTP](docker-mailserver)
+- ``wireguard`` for containers making use of [wireguard](wg-easy) network
 
-Setup commands for use in Bash:
+Setup commands for use in your terminal of choice:
 
 ```bash
-docker network create --attachable exposed
-docker network create --attachable --internal mqtt
-docker network create --attachable --internal proxy
-docker network create --attachable --internal s3
-docker network create --attachable --internal smarthome
-docker network create --attachable --internal smtp
+docker network create --attachable --opt com.docker.network.bridge.name=docker-exposed --opt com.docker.network.bridge.enable_icc=false --gateway=192.168.224.1 --subnet=192.168.224.0/20 --label="tech.sowi.version=beta" exposed;
+docker network create --attachable --internal --opt com.docker.network.bridge.name=docker-mqtt --gateway=192.168.176.1 --subnet=192.168.176.0/20 --label="tech.sowi.version=beta" mqtt;
+docker network create --attachable --internal --opt com.docker.network.bridge.name=docker-observe --gateway=192.168.160.1 --subnet=192.168.160.0/20 --label="tech.sowi.version=beta" observability;
+docker network create --attachable --internal --opt com.docker.network.bridge.name=docker-proxy --gateway=192.168.192.1 --subnet=192.168.192.0/20 --label="tech.sowi.version=beta" proxy;
+docker network create --attachable --internal --opt com.docker.network.bridge.name=docker-s3 --gateway=192.168.240.1 --subnet=192.168.240.0/20 --label="tech.sowi.version=beta" s3;
+docker network create --attachable --internal --opt com.docker.network.bridge.name=docker-smarthome --gateway=192.168.144.1 --subnet=192.168.144.0/20 --label="tech.sowi.version=beta" smarthome;
+docker network create --attachable --internal --opt com.docker.network.bridge.name=docker-smtp --gateway=192.168.208.1 --subnet=192.168.208.0/20 --label="tech.sowi.version=beta" smtp;
+docker network create --attachable --internal --opt com.docker.network.bridge.name=docker-wg --gateway=192.168.128.1 --subnet=192.168.128.0/20 --label="tech.sowi.version=beta" wireguard;
+```
+
+## `ufw-docker` setup
+
+For installation please refer to the [official instructions](https://github.com/chaifeng/ufw-docker?tab=readme-ov-file#install).
+
+Quick commands list:
+
+```bash
+ufw-docker install
+ufw-docker allow traefik
+ufw-docker allow anonaddy
+ufw-docker allow wg-easy
 ```
