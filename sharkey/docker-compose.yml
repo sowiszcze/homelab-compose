@@ -1,0 +1,74 @@
+name: sharkey
+
+services:
+
+  postgresql:
+    extends:
+      file: ../fragments/services.yml
+      service: postgres
+
+  meilisearch:
+    image: getmeili/meilisearch:${SHARKEY_MEILI_TAG:-v1.3.4}
+    container_name: ${COMPOSE_PROJECT_NAME}-meilisearch
+    extends:
+      file: ../fragments/services.yml
+      service: service-sub-hc
+    environment:
+      - MEILI_NO_ANALYTICS=true
+      - MEILI_ENV=production
+      - MEILI_MASTER_KEY=${MEILI_KEY:?Meilisearch master key has to be defined.}
+    healthcheck:
+      test: set -o pipefail; curl -fsS http://localhost:7700/health | grep -q '{"status":"available"}' || exit 1
+    networks:
+      - default
+    volumes:
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}/meilisearch:/meili_data
+
+  valkey:
+    extends:
+      file: ../fragments/services.yml
+      service: valkey-persistent
+    command: "--save 60 1 --loglevel notice"
+
+  sharkey:
+    image: registry.activitypub.software/transfem-org/sharkey:${SHARKEY_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb-hc
+    deploy:
+      resources:
+        limits:
+          memory: 4096M
+    networks:
+      - default
+      - exposed
+      - proxy
+      - smtp
+    environment:
+      NODE_ENV: production
+      NODE_OPTIONS: --max-old-space-size=3072
+    volumes:
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}/custom:/sharkey/custom:ro
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}/files:/sharkey/files
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/sharkey/.config:ro
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      meilisearch:
+        condition: service_healthy
+    healthcheck:
+      test: wget -q --spider --proxy=off http://127.0.0.1:3000/ 2>/dev/null || exit 1
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=3000"
+
+networks:
+  default:
+    internal: true
+  smtp:
+    external: true
+  exposed:
+    external: true
+  proxy:
+    external: true
