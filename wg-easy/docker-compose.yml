@@ -1,0 +1,39 @@
+name: wg-easy
+
+services:
+
+  wg-easy:
+    image: ghcr.io/wg-easy/wg-easy:${WG_ESASY_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb-hc
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.src_valid_mark=1
+    environment:
+      WG_HOST: ${DOMAIN_OVERRIDE:-${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}}
+      WG_DEVICE: exposed
+      WG_DEFAULT_ADDRESS: ${DEFAULT_ADDRESS:-10.0.0.x}
+      WG_ALLOWED_IPS: ${ALLOWED_IPS:-10.0.0.0/24}
+      WG_PERSISTENT_KEEPALIVE: ${PERSISTENT_KEEPALIVE:-25}
+      UI_CHART_TYPE: ${CHART_TYPE:-0}
+      UI_ENABLE_SORT_CLIENTS: ${SORT_CLIENTS:-false}
+      ENABLE_PROMETHEUS_METRICS: ${ENABLE_PROMETHEUS:-false}
+    volumes:
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/etc/wireguard
+    networks:
+      - exposed
+    ports:
+      - "51820:51820/udp"
+    labels:
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=${AUTH_MIDDLEWARE:?Auth middleware is not defined}"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=51821"
+
+networks:
+  proxy:
+    external: true
+  exposed:
+    external: true
