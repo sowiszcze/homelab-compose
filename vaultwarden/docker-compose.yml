@@ -13,7 +13,7 @@ services:
     environment:
       - WEBSOCKET_ENABLED
     volumes:
-      - data:/data/
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}:/data/
     labels:
       - "traefik.enable=true"
       # HTTP(S) service
@@ -29,6 +29,3 @@ networks:
     external: true
   smtp:
     external: true
-
-volumes:
-  data:
