@@ -1,12 +1,12 @@
 x-settings:
 
   labels:
-    - &version "tech.sowi.homelab.fragments.version=0.3"
+    - &version "tech.sowi.homelab.fragments.version=0.3.1"
     - &traefik "traefik.enable=true"
     - &traefik-svc "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
     - &traefik-entry "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
-    - &traefik-rule-glb "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=${DOMAIN_OVERRIDE:+Host(`${DOMAIN_OVERRIDE}`) || }Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
-    - &traefik-rule-loc "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=${DOMAIN_OVERRIDE:+Host(`${DOMAIN_OVERRIDE}`) || }Host(`${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine FQDN missing}`)"
+    - &traefik-rule-glb "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=${DOMAIN_OVERRIDE:+Host(`${DOMAIN_OVERRIDE:-}`) || }Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
+    - &traefik-rule-loc "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=${DOMAIN_OVERRIDE:+Host(`${DOMAIN_OVERRIDE:-}`) || }Host(`${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine FQDN missing}`)"
 
   healthcheck: &healthcheck-base
     start_interval: 1s
@@ -108,13 +108,13 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME}-db
     image: postgres:${POSTGRES_TAG:-alpine}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
+      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB:-} -U $${POSTGRES_USER:-}"]
     volumes:
       - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}/db:/var/lib/postgresql/data:Z
     environment:
       POSTGRES_DB: ${DB_NAME:-${COMPOSE_PROJECT_NAME}}
       POSTGRES_USER: ${DB_USER:-${COMPOSE_PROJECT_NAME}}
-      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_PASSWORD: ${DB_PASS:-}
 
   mariadb:
     <<: *svc-sub-hc
@@ -127,4 +127,4 @@ services:
     environment:
       MYSQL_DATABASE: ${DB_NAME:-${COMPOSE_PROJECT_NAME}}
       MYSQL_USER: ${DB_USER:-${COMPOSE_PROJECT_NAME}}
-      MYSQL_PASSWORD: ${DB_PASS}
+      MYSQL_PASSWORD: ${DB_PASS:-}
