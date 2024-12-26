@@ -1,0 +1,23 @@
+name: myip
+
+services:
+
+  myip:
+    image: jason5ng32/myip:${MYIP_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
+    stdin_open: true
+    tty: true
+    networks:
+      - exposed
+      - proxy
+    labels:
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=${AUTH_MIDDLEWARE:?Auth middleware is not defined}"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=18966"
+
+networks:
+  exposed:
+    external: true
+  proxy:
+    external: true
