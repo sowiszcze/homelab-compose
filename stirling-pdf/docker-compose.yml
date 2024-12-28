@@ -3,19 +3,29 @@ name: stirling-pdf
 services:
 
   stirling-pdf:
-    image: frooodle/s-pdf:${STIRLINGPDF_TAG:-latest}
+    image: stirlingtools/stirling-pdf:${STIRLINGPDF_TAG:-latest}
     extends:
       file: ../fragments/services.yml
       service: service-main-web-glb
     environment:
-      - DOCKER_ENABLE_SECURITY
+      ALLOW_GOOGLE_VISIBILITY: false
+      INSTALL_BOOK_AND_ADVANCED_HTML_OPS: ${ENABLE_ADVANCED:-false}
+      DOCKER_ENABLE_SECURITY: ${ENABLE_AUTH:-}
+      SECURITY_ENABLELOGIN: ${ENABLE_AUTH:-}
+      SECURITY_OAUTH2_ENABLED: ${ENABLE_AUTH:-}
+      SECURITY_OAUTH2_AUTOCREATEUSER: ${USER_AUTOCREATE:-false}
+      SECURITY_OAUTH2_ISSUER: ${OIDC_URL:-}
+      SECURITY_OAUTH2_CLIENTID: ${OIDC_CLIENT_ID:-}
+      SECURITY_OAUTH2_CLIENTSECRET: ${OIDC_CLIENT_SECRET:-}
+      LANGS: ${LANGUAGES:-en_GB}
     networks:
       - exposed
     volumes:
-      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/configs/
-      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}:/customFiles/
-      - ${TESSERACT_DATA:-/usr/share/tesseract-ocr/5/tessdata}:/usr/share/tesseract-ocr/5/tessdata/
-      - ${PROJECT_LOGS_DIR:-${LOGS_DIR:-/var/log}/${COMPOSE_PROJECT_NAME}}:/logs/
+      - ${TESSERACT_DATA:-/usr/share/tessdata}:/usr/share/tessdata
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/configs
+      - ${PROJECT_CUSTOM_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/customFiles}:/customFiles
+      - ${PROJECT_LOGS_DIR:-${LOGS_DIR:-/var/log}/${COMPOSE_PROJECT_NAME}}:/logs
+      - ${PROJECT_PIPELINE_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/pipeline}:/pipeline
     labels:
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8080"
 
