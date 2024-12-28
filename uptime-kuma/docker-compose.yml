@@ -9,7 +9,6 @@ services:
       service: service-main-web-loc-hc
     networks:
       - exposed
-      - smarthome
     volumes:
       - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}:/app/data
       - /var/run/docker.sock:/var/run/docker.sock
@@ -20,6 +19,4 @@ networks:
   exposed:
     external: true
   proxy:
-    external: true
-  smarthome:
     external: true
