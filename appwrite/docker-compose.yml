@@ -1,0 +1,285 @@
+name: appwrite
+
+x-services-templates:
+  appwrite-service: &appwrite-service
+    extends:
+      file: ../fragments/services.yml
+      service: service-sub
+    env_file: stack.env
+    networks: &basic-networks
+      default:
+      exposed:
+  appwrite-web-service: &appwrite-web-service
+    networks: &all-networks
+      <<: *basic-networks
+      proxy:
+    labels:
+      - &traefik-enable "traefik.enable=true"
+
+services:
+
+  app:
+    image: &appwrite-image appwrite/appwrite:${APPWRITE_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
+    env_file: stack.env
+    volumes:
+      - &upl-dir ${PROJECT_UPLOADS_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/uploads}:/storage/uploads:rw
+      - &cache-dir ${PROJECT_CACHE_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/cache}:/storage/cache:rw
+      - &cfg-dir ${PROJECT_CONFIG_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/config}:/storage/config:rw
+      - &crt-dir ${PROJECT_CERTIFICATES_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/certificates}:/storage/certificates:rw
+      - &fun-dir ${PROJECT_FUNCTIONS_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/functions}:/storage/functions:rw
+    depends_on: &store-dependencies
+      mariadb:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    networks: *all-networks
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=80"
+
+  console:
+    <<: *appwrite-web-service
+    container_name: ${COMPOSE_PROJECT_NAME}-console
+    image: appwrite/console:${APPWRITE_CONSOLE_TAG:-latest}
+    labels:
+      - *traefik-enable
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-console.entrypoints=http,https"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-console.rule=(${DOMAIN_OVERRIDE:+Host(`${DOMAIN_OVERRIDE:-}`) || }Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:-}`)) && PathPrefix(`/console`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-console.service=${COMPOSE_PROJECT_NAME}-console"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}-console.loadbalancer.server.port=80"
+
+  realtime:
+    <<: *appwrite-web-service
+    image: *appwrite-image
+    entrypoint: realtime
+    container_name: ${COMPOSE_PROJECT_NAME}-realtime
+    depends_on: *store-dependencies
+    labels:
+      - *traefik-enable
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-realtime.entrypoints=http,https"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-realtime.rule=(${DOMAIN_OVERRIDE:+Host(`${DOMAIN_OVERRIDE:-}`) || }Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:-}`)) && PathPrefix(`/v1/realtime`)"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-realtime.service=${COMPOSE_PROJECT_NAME}-realtime"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}-realtime.loadbalancer.server.port=80"
+
+  worker-audits:
+    <<: *appwrite-service
+    image: *appwrite-image
+    entrypoint: worker-audits
+    container_name: ${COMPOSE_PROJECT_NAME}-worker-audits
+    depends_on: *store-dependencies
+
+  worker-webhooks:
+    <<: *appwrite-service
+    image: *appwrite-image
+    entrypoint: worker-webhooks
+    container_name: ${COMPOSE_PROJECT_NAME}-worker-webhooks
+    depends_on: *store-dependencies
+
+  worker-deletes:
+    <<: *appwrite-service
+    image: *appwrite-image
+    entrypoint: worker-deletes
+    container_name: ${COMPOSE_PROJECT_NAME}-worker-deletes
+    depends_on: *store-dependencies
+    volumes:
+      - *upl-dir
+      - *cache-dir
+      - *fun-dir
+      - &build-dir ${PROJECT_BUILDS_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/builds}:/storage/builds:rw
+      - *crt-dir
+
+  worker-databases:
+    <<: *appwrite-service
+    image: *appwrite-image
+    entrypoint: worker-databases
+    container_name: ${COMPOSE_PROJECT_NAME}-databases
+    depends_on: *store-dependencies
+
+  worker-builds:
+    <<: *appwrite-service
+    image: *appwrite-image
+    entrypoint: worker-builds
+    container_name: ${COMPOSE_PROJECT_NAME}-worker-builds
+    depends_on: *store-dependencies
+    volumes:
+      - *fun-dir
+      - *build-dir
+
+  worker-certificates:
+    <<: *appwrite-service
+    image: *appwrite-image
+    entrypoint: worker-certificates
+    container_name: ${COMPOSE_PROJECT_NAME}-worker-certificates
+    depends_on: *store-dependencies
+    volumes:
+      - *cfg-dir
+      - *crt-dir
+
+  worker-functions:
+    <<: *appwrite-service
+    image: *appwrite-image
+    entrypoint: worker-functions
+    container_name: ${COMPOSE_PROJECT_NAME}-worker-functions
+    depends_on:
+      <<: *store-dependencies
+      openruntimes-executor:
+        condition: service_started
+
+  worker-mails:
+    <<: *appwrite-service
+    image: *appwrite-image
+    entrypoint: worker-mails
+    container_name: ${COMPOSE_PROJECT_NAME}-worker-mails
+    depends_on:
+      valkey:
+        condition: service_healthy
+
+  worker-messaging:
+    <<: *appwrite-service
+    image: *appwrite-image
+    entrypoint: worker-messaging
+    container_name: ${COMPOSE_PROJECT_NAME}-worker-messaging
+    volumes:
+      - *upl-dir
+    depends_on:
+      valkey:
+        condition: service_healthy
+
+  worker-migrations:
+    <<: *appwrite-service
+    image: *appwrite-image
+    entrypoint: worker-migrations
+    container_name: ${COMPOSE_PROJECT_NAME}-worker-migrations
+    depends_on:
+      mariadb:
+        condition: service_healthy
+
+  task-maintenance:
+    <<: *appwrite-service
+    image: *appwrite-image
+    entrypoint: maintenance
+    container_name: ${COMPOSE_PROJECT_NAME}-task-maintenance
+    depends_on:
+      valkey:
+        condition: service_healthy
+
+  worker-usage:
+    <<: *appwrite-service
+    image: *appwrite-image
+    entrypoint: worker-usage
+    container_name: ${COMPOSE_PROJECT_NAME}-worker-usage
+    depends_on: *store-dependencies
+    profiles:
+      - usage
+
+  worker-usage-dump:
+    <<: *appwrite-service
+    image: *appwrite-image
+    entrypoint: worker-usage-dump
+    container_name: ${COMPOSE_PROJECT_NAME}-worker-usage-dump
+    depends_on: *store-dependencies
+    profiles:
+      - usage
+
+  task-scheduler-functions:
+    <<: *appwrite-service
+    image: *appwrite-image
+    entrypoint: schedule-functions
+    container_name: ${COMPOSE_PROJECT_NAME}-task-scheduler-functions
+    depends_on: *store-dependencies
+
+  task-scheduler-executions:
+    <<: *appwrite-service
+    image: *appwrite-image
+    entrypoint: schedule-executions
+    container_name: ${COMPOSE_PROJECT_NAME}-task-scheduler-executions
+    depends_on: *store-dependencies
+
+  task-scheduler-messages:
+    <<: *appwrite-service
+    image: *appwrite-image
+    entrypoint: schedule-messages
+    container_name: ${COMPOSE_PROJECT_NAME}-task-scheduler-messages
+    depends_on: *store-dependencies
+
+  assistant:
+    <<: *appwrite-service
+    image: appwrite/assistant:${APPWRITE_ASSISTANT_TAG:-latest}
+    container_name: ${COMPOSE_PROJECT_NAME}-assistant
+    profiles:
+      - ai
+    environment:
+      - _APP_ASSISTANT_OPENAI_API_KEY
+
+  openruntimes-executor:
+    <<: *appwrite-service
+    container_name: ${COMPOSE_PROJECT_NAME}-openruntimes-executor
+    hostname: exc1
+    stop_signal: SIGINT
+    image: openruntimes/executor:${APPWRITE_OREXECUTOR_TAG:-latest}
+    networks:
+      - runtimes
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - *build-dir
+      - *fun-dir
+      - /tmp:/tmp:rw
+    environment:
+      - OPR_EXECUTOR_INACTIVE_TRESHOLD=$_APP_FUNCTIONS_INACTIVE_THRESHOLD
+      - OPR_EXECUTOR_MAINTENANCE_INTERVAL=$_APP_FUNCTIONS_MAINTENANCE_INTERVAL
+      - OPR_EXECUTOR_NETWORK=$_APP_FUNCTIONS_RUNTIMES_NETWORK
+      - OPR_EXECUTOR_DOCKER_HUB_USERNAME=$_APP_DOCKER_HUB_USERNAME
+      - OPR_EXECUTOR_DOCKER_HUB_PASSWORD=$_APP_DOCKER_HUB_PASSWORD
+      - OPR_EXECUTOR_ENV=$_APP_ENV
+      - OPR_EXECUTOR_RUNTIMES=$_APP_FUNCTIONS_RUNTIMES
+      - OPR_EXECUTOR_SECRET=$_APP_EXECUTOR_SECRET
+      - OPR_EXECUTOR_LOGGING_CONFIG=$_APP_LOGGING_CONFIG
+      - OPR_EXECUTOR_STORAGE_DEVICE=$_APP_STORAGE_DEVICE
+      - OPR_EXECUTOR_STORAGE_S3_ACCESS_KEY=$_APP_STORAGE_S3_ACCESS_KEY
+      - OPR_EXECUTOR_STORAGE_S3_SECRET=$_APP_STORAGE_S3_SECRET
+      - OPR_EXECUTOR_STORAGE_S3_REGION=$_APP_STORAGE_S3_REGION
+      - OPR_EXECUTOR_STORAGE_S3_BUCKET=$_APP_STORAGE_S3_BUCKET
+      - OPR_EXECUTOR_STORAGE_DO_SPACES_ACCESS_KEY=$_APP_STORAGE_DO_SPACES_ACCESS_KEY
+      - OPR_EXECUTOR_STORAGE_DO_SPACES_SECRET=$_APP_STORAGE_DO_SPACES_SECRET
+      - OPR_EXECUTOR_STORAGE_DO_SPACES_REGION=$_APP_STORAGE_DO_SPACES_REGION
+      - OPR_EXECUTOR_STORAGE_DO_SPACES_BUCKET=$_APP_STORAGE_DO_SPACES_BUCKET
+      - OPR_EXECUTOR_STORAGE_BACKBLAZE_ACCESS_KEY=$_APP_STORAGE_BACKBLAZE_ACCESS_KEY
+      - OPR_EXECUTOR_STORAGE_BACKBLAZE_SECRET=$_APP_STORAGE_BACKBLAZE_SECRET
+      - OPR_EXECUTOR_STORAGE_BACKBLAZE_REGION=$_APP_STORAGE_BACKBLAZE_REGION
+      - OPR_EXECUTOR_STORAGE_BACKBLAZE_BUCKET=$_APP_STORAGE_BACKBLAZE_BUCKET
+      - OPR_EXECUTOR_STORAGE_LINODE_ACCESS_KEY=$_APP_STORAGE_LINODE_ACCESS_KEY
+      - OPR_EXECUTOR_STORAGE_LINODE_SECRET=$_APP_STORAGE_LINODE_SECRET
+      - OPR_EXECUTOR_STORAGE_LINODE_REGION=$_APP_STORAGE_LINODE_REGION
+      - OPR_EXECUTOR_STORAGE_LINODE_BUCKET=$_APP_STORAGE_LINODE_BUCKET
+      - OPR_EXECUTOR_STORAGE_WASABI_ACCESS_KEY=$_APP_STORAGE_WASABI_ACCESS_KEY
+      - OPR_EXECUTOR_STORAGE_WASABI_SECRET=$_APP_STORAGE_WASABI_SECRET
+      - OPR_EXECUTOR_STORAGE_WASABI_REGION=$_APP_STORAGE_WASABI_REGION
+      - OPR_EXECUTOR_STORAGE_WASABI_BUCKET=$_APP_STORAGE_WASABI_BUCKET
+
+  mariadb:
+    extends:
+      file: ../fragments/services.yml
+      service: mariadb
+    environment:
+      - MYSQL_ROOT_PASSWORD=${_APP_DB_ROOT_PASS}
+      - MYSQL_DATABASE=${_APP_DB_SCHEMA}
+      - MYSQL_USER=${_APP_DB_USER}
+      - MYSQL_PASSWORD=${_APP_DB_PASS}
+      - MARIADB_AUTO_UPGRADE=1
+
+  valkey:
+    extends:
+      file: ../fragments/services.yml
+      service: valkey-persistent
+
+networks:
+  default:
+    internal: true
+  runtimes:
+    internal: true
+  proxy:
+    external: true
+  exposed:
+    external: true
