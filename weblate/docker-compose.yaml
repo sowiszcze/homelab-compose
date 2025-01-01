@@ -1,0 +1,49 @@
+name: weblate
+
+services:
+
+  weblate:
+    image: weblate/weblate:${WEBLATE_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
+    read_only: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    env_file: stack.env
+    tmpfs:
+    - /run
+    - /tmp
+    volumes:
+    - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/data}:/app/data
+    - ${PROJECT_CACHE_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/cache}:/app/cache
+    networks:
+      - default
+      - exposed
+      - proxy
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8080"
+
+  postgres:
+    extends:
+      file: ../fragments/services.yml
+      service: postgres
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+  valkey:
+    extends:
+      file: ../fragments/services.yml
+      service: valkey-persistent
+    read_only: true
+
+networks:
+  default:
+    internal: true
+  exposed:
+    external: true
+  proxy:
+    external: true
