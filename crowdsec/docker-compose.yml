@@ -1,0 +1,62 @@
+name: crowdsec
+
+services:
+
+  crowdsec:
+    image: crowdsecurity/crowdsec:${CROWDSEC_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
+    environment:
+      DOCKER_HOST: tcp://socket-proxy:2375
+      COLLECTIONS: "${COLLECTIONS:-}"
+      GID: "${GID:-1000}"
+    networks:
+      - exposed
+      - default
+    volumes:
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/etc/crowdsec
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}:/var/lib/crowdsec/data
+      - /var/log:/var/log:ro
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8080"
+
+  socket-proxy:
+    image: lscr.io/linuxserver/socket-proxy:${CROWDSEC_SOCK_PROXY_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-sub
+    container_name: ${COMPOSE_PROJECT_NAME}-socket-proxy
+    environment:
+      INFO: 1
+      CONTAINERS: 1
+      POST: 0
+      BUILD: 0
+      COMMIT: 0
+      CONFIGS: 0
+      DISTRIBUTION: 0
+      EXEC: 0
+      GRPC: 0
+      IMAGES: 0
+      NETWORKS: 0
+      NODES: 0
+      PLUGINS: 0
+      SERVICES: 0
+      SESSION: 0
+      SWARM: 0
+      SYSTEM: 0
+      TASKS: 0
+      VOLUMES: 0
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock:ro'
+    read_only: true
+    tmpfs:
+      - /run
+
+networks:
+  proxy:
+    external: true
+  exposed:
+    external: true
+  default:
+    internal: true
