@@ -3,9 +3,10 @@ name: proxitok
 services:
 
   proxitok:
-    container_name: ${COMPOSE_PROJECT_NAME}
-    image: ghcr.io/pablouser1/proxitok:${PROXYTOK_TAG:-master}
-    restart: unless-stopped
+    image: ghcr.io/pablouser1/proxitok:${PROXITOK_TAG:-master}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb-hc
     security_opt:
       - no-new-privileges:true
     cap_drop:
@@ -19,63 +20,46 @@ services:
       - API_CACHE=redis
       - REDIS_HOST=${COMPOSE_PROJECT_NAME}-kv
       - REDIS_PORT=6379
-      - API_SIGNER=remote
-      - API_SIGNER_URL=http://${COMPOSE_PROJECT_NAME}-signer/signature
-    volumes:
-      - ${COMPOSE_PROJECT_NAME}-cache:/cache
+      - API_CHROMEDRIVER=http://proxitok-chromedriver:9515
+    tmpfs:
+      - /cache:size=10M,mode=0770,uid=65534,gid=65534,noexec,nosuid,nodev
     depends_on:
       - valkey
-      - signer
+      - chromedriver
     networks:
       - default
       - proxy
       - exposed
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=${PROXITOK_DOMAIN:+Host(`${PROXITOK_DOMAIN}`) || }Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=${AUTH_MIDDLEWARE:?Auth middleware is not defined}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8080"
+      - "io.containers.autoupdate=registry"
 
   valkey:
-    container_name: ${COMPOSE_PROJECT_NAME}-kv
-    image: valkey/valkey:${PROXYTOK_VALKEY_TAG:-alpine}
-    command: --save 60 1 --loglevel warning
-    restart: unless-stopped
-    networks:
-      - default
-    healthcheck:
-      test: ["CMD-SHELL", "valkey-cli ping | grep PONG"]
-      start_period: 20s
-      interval: 30s
-      retries: 5
-      timeout: 3s
-    user: nobody
-    read_only: true
-    security_opt:
-      - no-new-privileges:true
-    tmpfs:
-      - /data:size=10M,mode=0770,uid=65534,gid=65534,noexec,nosuid,nodev
-    cap_drop:
-      - ALL
-
-  signer:
-    container_name: ${COMPOSE_PROJECT_NAME}-signer
-    image: ghcr.io/pablouser1/signtok:${PROXYTOK_SIGNER_TAG:-master}
-    restart: unless-stopped
+    extends:
+      file: ../fragments/services.yml
+      service: valkey-ephemeral
     init: true
-    networks:
-      - default
     user: nobody
     read_only: true
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    labels:
+      - "io.containers.autoupdate=registry"
 
-volumes:
-  proxitok-cache:
+  chromedriver:
+    container_name: ${COMPOSE_PROJECT_NAME}-chromedriver
+    image: zenika/alpine-chrome:${PROXITOK_CHROMEDRIVER_TAG:-with-chromedriver}
+    extends:
+      file: ../fragments/services.yml
+      service: service-sub
+    init: true
+    shm_size: 1g
+    security_opt:
+      - seccomp:${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}/chrome.json
+    labels:
+      - "io.containers.autoupdate=registry"
 
 networks:
   default:
