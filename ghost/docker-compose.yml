@@ -1,4 +1,4 @@
-name: ghost
+name: ${STACK_NAME:-ghost}
 
 services:
 
@@ -26,10 +26,14 @@ services:
     volumes:
       - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}/content:/var/lib/ghost/content
     networks:
-      - default
-      - exposed
-      - proxy
-      - smtp
+      default:
+        priority: 40
+      exposed:
+        priority: 10
+      proxy:
+        priority: 20
+      smtp:
+        priority: 30
     depends_on:
       mysql:
         condition: service_started
