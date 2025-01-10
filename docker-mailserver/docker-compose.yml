@@ -22,7 +22,6 @@ services:
         aliases:
           - mail.${COMPOSE_DOMAIN}
           - ${COMPOSE_PROJECT_NAME}
-          - mailserver
       exposed:
         priority: 20
     env_file: stack.env
