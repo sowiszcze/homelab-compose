@@ -17,7 +17,7 @@ services:
       database__connection__database: ${DB_NAME:-${COMPOSE_PROJECT_NAME}}
       mail__from: ${GHOST_MAIL_FROM:-support@example.com}
       mail__transport: ${GHOST_MAIL_TRANSPORT:-SMTP}
-      mail__options__service: ${GHOST_MAIL_SERVICE}
+      mail__options__service: ${GHOST_MAIL_SERVICE:-}
       mail__options__host: ${GHOST_MAIL_HOST}
       mail__options__port: ${GHOST_MAIL_PORT:-465}
       mail__options__secure: ${GHOST_MAIL_USETLS:-true}
@@ -28,12 +28,12 @@ services:
     networks:
       default:
         priority: 40
-      exposed:
-        priority: 10
-      proxy:
-        priority: 20
       smtp:
         priority: 30
+      proxy:
+        priority: 20
+      exposed:
+        priority: 10
     depends_on:
       mysql:
         condition: service_started
