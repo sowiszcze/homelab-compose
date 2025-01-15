@@ -32,8 +32,12 @@ services:
         priority: 30
       proxy:
         priority: 20
-      exposed:
+      outgoing:
         priority: 10
+    dns:
+      - 1.1.1.1 # Cloudflare
+      - 208.67.222.222 # OpenDNS
+      - 94.140.14.14 # AdGuard
     depends_on:
       mysql:
         condition: service_started
@@ -56,8 +60,10 @@ services:
 networks:
   default:
     internal: true
-  exposed:
-    external: true
+  outgoing:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "false"
   proxy:
     external: true
   smtp:
