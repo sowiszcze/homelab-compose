@@ -1,0 +1,5 @@
+networks:
+  default:
+    internal: true
+    labels:
+      - "tech.sowi.homelab.fragments.version=0.4.1"

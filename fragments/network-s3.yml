@@ -1,0 +1,3 @@
+networks:
+  s3:
+    external: true
