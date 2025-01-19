@@ -1,0 +1,7 @@
+networks:
+  outgoing:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.enable_icc: "false"
+    labels:
+      - "tech.sowi.homelab.fragments.version=0.4.0"

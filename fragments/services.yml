@@ -1,7 +1,7 @@
 x-settings:
 
   labels:
-    - &version "tech.sowi.homelab.fragments.version=0.3.1"
+    - &version "tech.sowi.homelab.fragments.version=0.4.0"
     - &traefik "traefik.enable=true"
     - &traefik-svc "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
     - &traefik-entry "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
