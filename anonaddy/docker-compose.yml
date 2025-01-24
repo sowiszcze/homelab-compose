@@ -1,40 +1,41 @@
-name: anonaddy
+name: ${STACK_NAME:-anonaddy}
+
+include:
+  - ../fragments/network-default.yml
+  - ../fragments/network-proxy.yml
+  - ../fragments/network-outgoing.yml
 
 services:
 
   anonaddy:
-    container_name: ${COMPOSE_PROJECT_NAME}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
     image: anonaddy/anonaddy:${ANONADDY_TAG:-latest}
     depends_on:
       mariadb:
         condition: service_healthy
       valkey:
         condition: service_healthy
-    restart: unless-stopped
     volumes:
-      - /srv/${COMPOSE_PROJECT_NAME}/app:/data
-      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - ${ANONADDY_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/app}:/data
+      - ${LETSENCRYPT_DIR:-/etc/letsencrypt}:/etc/letsencrypt:ro
     env_file: stack.env
     environment:
       - DB_HOST=${COMPOSE_PROJECT_NAME}-db
-      - DB_DATABASE=${MYSQL_DATABASE}
-      - DB_USERNAME=${MYSQL_USER}
-      - DB_PASSWORD=${MYSQL_PASSWORD}
+      - DB_DATABASE=${DB_NAME:-${COMPOSE_PROJECT_NAME}}
+      - DB_USERNAME=${DB_USER:-${COMPOSE_PROJECT_NAME}}
+      - DB_PASSWORD=${DB_PASS:-}
       - REDIS_HOST=${COMPOSE_PROJECT_NAME}-kv
     ports:
       - 25:25/tcp
     networks:
       - default
       - proxy
-      - exposed
+      - outgoing
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8000"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-rspamd.rule=Host(`${COMPOSE_PROJECT_NAME}-rspamd.${COMPOSE_DOMAIN}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-rspamd.middlewares=${AUTH_MIDDLEWARE:?Auth middleware is not defined}"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-rspamd.service=${COMPOSE_PROJECT_NAME}-rspamd"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-rspamd.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}-rspamd.loadbalancer.server.port=11334"
@@ -44,11 +45,13 @@ services:
   well-known:
     image: nginx:${ANONADDY_NGINX_TAG:-alpine}
     container_name: ${COMPOSE_PROJECT_NAME}-nginx
+    extends:
+      file: ../fragments/services.yml
+      service: service-sub
     volumes:
-      - /srv/${COMPOSE_PROJECT_NAME}/well-known:/usr/share/nginx/html:ro
+      - ${WELL_KNOWN_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/well-known}:/usr/share/nginx/html:ro
     networks:
       - proxy
-    restart: unless-stopped
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-nginx.rule=(Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}`) || ${MTA_STS_HOSTS:-Host(`mta-sts.${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}`)}) && PathPrefix(`/.well-known`)"
@@ -57,48 +60,16 @@ services:
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}-nginx.loadbalancer.server.port=80"
 
   mariadb:
+    extends:
+      file: ../fragments/services.yml
+      service: mariadb
     image: mariadb:${ANONADDY_MARIA_TAG:-10.5}
-    container_name: ${COMPOSE_PROJECT_NAME}-db
     command:
       - "mysqld"
       - "--character-set-server=utf8mb4"
       - "--collation-server=utf8mb4_unicode_ci"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", 'mysqladmin', 'ping', '-h', 'localhost', '-u', '$MYSQL_USER', '-p$MYSQL_PASSWORD' ]
-      interval: 10s
-      timeout: 1s
-      retries: 3
-      start_period: 30s
-      start_interval: 2s
-    volumes:
-      - /srv/${COMPOSE_PROJECT_NAME}/db:/var/lib/mysql
-    environment:
-      - MYSQL_ALLOW_EMPTY_PASSWORD=no
-      - MYSQL_DATABASE
-      - MYSQL_USER
-      - MYSQL_PASSWORD
-    networks:
-      - default
 
   valkey:
-    image: valkey/valkey:${ANONADDY_VALKEY_TAG:-alpine}
-    container_name: ${COMPOSE_PROJECT_NAME}-kv
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "valkey-cli ping | grep PONG"]
-      interval: 10s
-      timeout: 1s
-      retries: 3
-      start_period: 30s
-      start_interval: 2s
-    networks:
-      - default
-
-networks:
-  default:
-    internal: true
-  proxy:
-    external: true
-  exposed:
-    external: true
+    extends:
+      file: ../fragments/services.yml
+      service: valkey-persistent
