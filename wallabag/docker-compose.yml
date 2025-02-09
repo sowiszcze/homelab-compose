@@ -35,7 +35,7 @@ services:
       - smtp
       - outgoing
     volumes:
-      - ${ASSETS_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/assets}A:/var/www/wallabag/web/assets/images
+      - ${ASSETS_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/assets}:/var/www/wallabag/web/assets/images
     healthcheck:
       test: ["CMD", "wget" ,"--no-verbose", "--tries=1", "--spider", "http://localhost"]
     labels:
