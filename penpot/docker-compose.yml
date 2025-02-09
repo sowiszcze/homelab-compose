@@ -1,44 +1,56 @@
-name: penpot
+name: ${STACK_NAME:-penpot}
+
+include:
+  - ../fragments/network-default.yml
+  - ../fragments/network-outgoing.yml
+  - ../fragments/network-proxy.yml
+  - ../fragments/network-s3.yml
+  - ../fragments/network-smtp.yml
 
 services:
 
   frontend:
     container_name: ${COMPOSE_PROJECT_NAME}-frontend
     image: penpotapp/frontend:${PENPOT_FRONTEND_TAG:-latest}
-    restart: unless-stopped
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb-hc
     volumes:
-      - /srv/${COMPOSE_PROJECT_NAME}/assets:/opt/data/assets
+      - &assets-dir ${ASSETS_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/assets}:/opt/data/assets
     depends_on:
-      - backend
-      - exporter
+      backend:
+        condition: service_healthy
+      exporter:
+        condition: service_healthy
+    healthcheck:
+      test: "(curl --fail --silent http://localhost:8080/ > /dev/null) || exit 1"
     networks:
       - default
-      - proxy
     environment:
-      - PENPOT_FLAGS=${PENPOT_FRONT_FLAGS:-enable-registration enable-login-with-password}
-      - PENPOT_BACKEND_URI=http://${COMPOSE_PROJECT_NAME}-backend:6060
-      - PENPOT_EXPORTER_URI=http://${COMPOSE_PROJECT_NAME}-exporter:6061
+      PENPOT_FLAGS: ${PENPOT_FRONT_FLAGS:-enable-registration enable-login-with-password}
+      PENPOT_BACKEND_URI: http://${COMPOSE_PROJECT_NAME}-backend:6060
+      PENPOT_EXPORTER_URI: http://${COMPOSE_PROJECT_NAME}-exporter:6061
+      PENPOT_HTTP_SERVER_MAX_BODY_SIZE: 31457280
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
-      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=80"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8080"
 
   backend:
     container_name: ${COMPOSE_PROJECT_NAME}-backend
     image: penpotapp/backend:${PENPOT_BACKEND_TAG:-latest}
-    restart: unless-stopped
+    extends:
+      file: ../fragments/services.yml
+      service: service-sub-hc
     volumes:
-      - /srv/${COMPOSE_PROJECT_NAME}/assets:/opt/data/assets
+      - *assets-dir
     depends_on:
       postgres:
         condition: service_healthy
       valkey:
         condition: service_healthy
+    healthcheck:
+      test: "(curl --fail --silent http://localhost:6060/ > /dev/null) || exit 1"
     networks:
-      - default
-      - exposed
+      - outgoing
       - smtp
       - s3
     environment:
@@ -46,9 +58,9 @@ services:
       - PENPOT_SECRET_KEY=${PENPOT_SECRET:?Penpot secret not set}
       - PENPOT_PREPL_HOST=${PENPOT_PREPL_IP:-0.0.0.0}
       - PENPOT_PUBLIC_URI=https://${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}
-      - PENPOT_DATABASE_URI=postgresql://${COMPOSE_PROJECT_NAME}-db/${PENPOT_DB_NAME:-penpot}
-      - PENPOT_DATABASE_USERNAME=${PENPOT_DB_USER:-penpot}
-      - PENPOT_DATABASE_PASSWORD=${PENPOT_DB_PASS:-penpot}
+      - PENPOT_DATABASE_URI=postgresql://${COMPOSE_PROJECT_NAME}-db/${DB_NAME:-penpot}
+      - PENPOT_DATABASE_USERNAME=${DB_USER:-penpot}
+      - PENPOT_DATABASE_PASSWORD=${DB_PASS:-penpot}
       - PENPOT_REDIS_URI=${PENPOT_REDIS_ADDR:-redis://${COMPOSE_PROJECT_NAME}-kv/0}
       - PENPOT_ASSETS_STORAGE_BACKEND=${PENPOT_STORAGE:-assets-fs}
       - PENPOT_STORAGE_ASSETS_FS_DIRECTORY=/opt/data/assets
@@ -80,54 +92,24 @@ services:
   exporter:
     container_name: ${COMPOSE_PROJECT_NAME}-exporter
     image: penpotapp/exporter:${PENPOT_EXPORTER_TAG:-latest}
-    restart: unless-stopped
-    networks:
-      - default
+    extends:
+      file: ../fragments/services.yml
+      service: service-sub-hc
+    depends_on:
+      valkey:
+        condition: service_healthy
+    healthcheck:
+      test: "(curl --fail --silent http://localhost:6061/ > /dev/null) || exit 1"
     environment:
-      - PENPOT_PUBLIC_URI=http://${COMPOSE_PROJECT_NAME}-frontend
+      - PENPOT_PUBLIC_URI=http://${COMPOSE_PROJECT_NAME}-frontend:8080
       - PENPOT_REDIS_URI=${PENPOT_REDIS_ADDR:-redis://${COMPOSE_PROJECT_NAME}-kv/0}
 
   postgres:
-    container_name: ${COMPOSE_PROJECT_NAME}-db
-    image: postgres:${PENPOT_DB_TAG:-15}
-    restart: unless-stopped
-    stop_signal: SIGINT
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
-      start_period: 20s
-      interval: 30s
-      retries: 5
-      timeout: 5s
-    volumes:
-      - /srv/${COMPOSE_PROJECT_NAME}/postgres:/var/lib/postgresql/data
-    networks:
-      - default
-    environment:
-      - POSTGRES_INITDB_ARGS=--data-checksums
-      - POSTGRES_DB=${PENPOT_DB_NAME:-penpot}
-      - POSTGRES_USER=${PENPOT_DB_USER:-penpot}
-      - POSTGRES_PASSWORD=${PENPOT_DB_PASS:-penpot}
+    extends:
+      file: ../fragments/services.yml
+      service: postgres
 
   valkey:
-    container_name: ${COMPOSE_PROJECT_NAME}-kv
-    image: valkey/valkey:${PENPOT_KV_TAG:-alpine}
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "valkey-cli ping | grep PONG"]
-      start_period: 20s
-      interval: 30s
-      retries: 5
-      timeout: 3s
-    networks:
-      - default
-
-networks:
-  default:
-  exposed:
-    external: true
-  proxy:
-    external: true
-  smtp:
-    external: true
-  s3:
-    external: true
+    extends:
+      file: ../fragments/services.yml
+      service: valkey-ephemeral
