@@ -1,12 +1,12 @@
 x-settings:
 
   labels:
-    - &version "tech.sowi.homelab.fragments.version=0.4.1"
+    - &version "tech.sowi.homelab.fragments.version=0.4.2"
     - &traefik "traefik.enable=true"
     - &traefik-svc "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
     - &traefik-entry "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
-    - &traefik-rule-glb "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=${DOMAIN_OVERRIDE:+Host(`${DOMAIN_OVERRIDE:-}`) || }Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)"
-    - &traefik-rule-loc "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=${DOMAIN_OVERRIDE:+Host(`${DOMAIN_OVERRIDE:-}`) || }Host(`${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine FQDN missing}`)"
+    - &traefik-rule-glb "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=${DOMAIN_OVERRIDE:+Host(`${DOMAIN_OVERRIDE:-}`) || }Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)${OPTIONAL_ROUTER_RULES:+ || ${OPTIONAL_ROUTER_RULES:-}}"
+    - &traefik-rule-loc "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=${DOMAIN_OVERRIDE:+Host(`${DOMAIN_OVERRIDE:-}`) || }Host(`${COMPOSE_PROJECT_NAME}.${MACHINE_DOMAIN:?Machine FQDN missing}`)${OPTIONAL_ROUTER_RULES:+ || ${OPTIONAL_ROUTER_RULES:-}}"
 
   healthcheck: &healthcheck-base
     start_interval: 1s
