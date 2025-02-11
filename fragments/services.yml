@@ -1,7 +1,7 @@
 x-settings:
 
   labels:
-    - &version "tech.sowi.homelab.fragments.version=0.4.2"
+    - &version "tech.sowi.homelab.fragments.version=0.5"
     - &traefik "traefik.enable=true"
     - &traefik-svc "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
     - &traefik-entry "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
@@ -97,7 +97,7 @@ services:
     <<: *valkey
     command: "--save 60 1 --loglevel warning"
     volumes:
-      - /srv/${COMPOSE_PROJECT_NAME}/kv:/data:Z
+      - ${VALKEY_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/kv}:/data:Z
 
   valkey-ephemeral:
     <<: *valkey
@@ -110,7 +110,7 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB:-} -U $${POSTGRES_USER:-}"]
     volumes:
-      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}/db:/var/lib/postgresql/data:Z
+      - ${POSTGRES_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/db}:/var/lib/postgresql/data:Z
     environment:
       POSTGRES_DB: ${DB_NAME:-${COMPOSE_PROJECT_NAME}}
       POSTGRES_USER: ${DB_USER:-${COMPOSE_PROJECT_NAME}}
@@ -123,8 +123,21 @@ services:
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
     volumes:
-      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}/db:/var/lib/mysql:Z
+      - ${MARIA_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/db}:/var/lib/mysql:Z
     environment:
       MYSQL_DATABASE: ${DB_NAME:-${COMPOSE_PROJECT_NAME}}
       MYSQL_USER: ${DB_USER:-${COMPOSE_PROJECT_NAME}}
       MYSQL_PASSWORD: ${DB_PASS:-}
+
+  mongo:
+    <<: *svc-sub-hc
+    container_name: ${COMPOSE_PROJECT_NAME}-db
+    image: mongo:${MONGO_TAG:-latest}
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh mongodb://${DB_USER}:${DB_PASS}@localhost:27017/test?authSource=${DB_NAME} --quiet
+    volumes:
+      - ${MONGO_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/db}:/data/db:Z
+    environment:
+      MONGO_INITDB_DATABASE: ${DB_NAME:-${COMPOSE_PROJECT_NAME}}
+      MONGO_INITDB_ROOT_USERNAME: ${DB_USER:-${COMPOSE_PROJECT_NAME}}
+      MONGO_INITDB_ROOT_PASSWORD: ${DB_PASS:-}
