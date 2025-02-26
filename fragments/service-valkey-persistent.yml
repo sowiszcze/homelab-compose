@@ -1,0 +1,5 @@
+services:
+  valkey:
+    extends:
+      file: ./services.yml
+      service: valkey-persistent

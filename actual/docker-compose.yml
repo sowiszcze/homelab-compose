@@ -1,9 +1,13 @@
-name: actual
+name: ${STACK_NAME:-actual}
+
+include:
+  - ../fragments/network-proxy.yml
+  - ../fragments/network-outgoing.yml
 
 services:
 
   actual:
-    image: actualbudget/actual-server:${ACTUAL_TAG:-latest}
+    image: actualbudget/actual-server:${ACTUAL_TAG:-latest-alpine}
     extends:
       file: ../fragments/services.yml
       service: service-main-web-glb-hc
@@ -12,17 +16,18 @@ services:
     volumes:
       - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}:/data
     environment:
-      ACTUAL_LOGIN_METHOD: header
-      ACTUAL_TRUSTED_PROXIES: "[10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, fc00::/7, ::1/128]"
+      ACTUAL_LOGIN_METHOD: ${LOGIN_METHOD:-openid}
+      ACTUAL_TRUSTED_PROXIES: "${TRUSTED_PROXIES:-[10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, fc00::/7, ::1/128]}"
+      ACTUAL_OPENID_DISCOVERY_URL: ${OIDC_DISCOVERY_URL:-}
+      ACTUAL_OPENID_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      ACTUAL_OPENID_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      ACTUAL_OPENID_SERVER_HOSTNAME: ${OIDC_HOSTNAME:-${DOMAIN_OVERRIDE:-${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}}}
+      ACTUAL_OPENID_AUTHORIZATION_ENDPOINT: ${OIDC_AUTH_ENDPOINT:-}
+      ACTUAL_OPENID_TOKEN_ENDPOINT: ${OIDC_TOKEN_ENDPOINT:-}
+      ACTUAL_OPENID_USERINFO_ENDPOINT: ${OIDC_USER_ENDPOINT:-}
     networks:
-      - exposed
+      - outgoing
     labels:
       - "traefik.http.middlewares.${COMPOSE_PROJECT_NAME}-headers.headers.customrequestheaders.X-Forwarded-For="
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=${AUTH_MIDDLEWARE:?Auth middleware is not defined},${COMPOSE_PROJECT_NAME}-headers"
+      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=${COMPOSE_PROJECT_NAME}-headers"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=5006"
-
-networks:
-  proxy:
-    external: true
-  exposed:
-    external: true

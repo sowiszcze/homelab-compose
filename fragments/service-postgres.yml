@@ -1,0 +1,5 @@
+services:
+  postgres:
+    extends:
+      file: ./services.yml
+      service: postgres

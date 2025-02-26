@@ -1,0 +1,5 @@
+services:
+  mariadb:
+    extends:
+      file: ./services.yml
+      service: mariadb

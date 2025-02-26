@@ -6,6 +6,8 @@ include:
   - ../fragments/network-proxy.yml
   - ../fragments/network-s3.yml
   - ../fragments/network-smtp.yml
+  - ../fragments/service-postgres.yml
+  - ../fragments/service-valkey-ephemeral.yml
 
 services:
 
@@ -103,13 +105,3 @@ services:
     environment:
       - PENPOT_PUBLIC_URI=http://${COMPOSE_PROJECT_NAME}-frontend:8080
       - PENPOT_REDIS_URI=${PENPOT_REDIS_ADDR:-redis://${COMPOSE_PROJECT_NAME}-kv/0}
-
-  postgres:
-    extends:
-      file: ../fragments/services.yml
-      service: postgres
-
-  valkey:
-    extends:
-      file: ../fragments/services.yml
-      service: valkey-ephemeral

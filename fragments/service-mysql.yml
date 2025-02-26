@@ -1,0 +1,5 @@
+services:
+  mysql:
+    extends:
+      file: ./services.yml
+      service: mysql

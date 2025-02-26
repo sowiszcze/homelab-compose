@@ -1,8 +1,15 @@
-name: gitea
+name: ${STACK_NAME:-gitea}
+
+include:
+  - ../fragments/network-default.yml
+  - ../fragments/network-outgoing.yml
+  - ../fragments/network-proxy.yml
+  - ../fragments/network-smtp.yml
+  - ../fragments/service-postgres.yml
 
 services:
 
-  n8n:
+  gitea:
     image: gitea/gitea:${GITEA_TAG:-latest}
     extends:
       file: ../fragments/services.yml
@@ -13,7 +20,7 @@ services:
     volumes:
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
-      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}/data:/data
+      - ${GITEA_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/data}:/data
     ports:
       - "${GITEA_SSH_PORT:-222}:22"
     environment:
@@ -25,33 +32,18 @@ services:
       GITEA__database__USER: ${DB_USER:-${COMPOSE_PROJECT_NAME}}
       GITEA__database__PASSWD: ${DB_PASS}
       GITEA__mailer__ENABLED: true
-      GITEA__mailer__FROM: "Gitea <${COMPOSE_PROJECT_NAME}@mail.${COMPOSE_DOMAIN}>"
-      GITEA__mailer__PROTOCOL: smtp
-      GITEA__mailer__SMTP_ADDR: docker-mailserver
-      GITEA__mailer__SMTP_PORT: 25
-      GITEA__mailer__USER: ${GITEA_SMTP_USER}
-      GITEA__mailer__PASSWD: ${GITEA_SMTP_PASS}
-      GITEA__security__SECRET_KEY: ${GITEA_KEY}
-      GITEA__security__INTERNAL_TOKEN: ${GITEA_TOKEN}
+      GITEA__mailer__FROM: ${MAIL_FROM:-"Gitea <no-reply@${COMPOSE_DOMAIN}>"}
+      GITEA__mailer__PROTOCOL: ${MAIL_PROT:-smtp}
+      GITEA__mailer__SMTP_ADDR: ${MAIL_ADDR:-docker-mailserver}
+      GITEA__mailer__SMTP_PORT: ${MAIL_PORT:-25}
+      GITEA__mailer__USER: ${MAIL_USER:-}
+      GITEA__mailer__PASSWD: ${MAIL_PASS:-}
+      GITEA__security__SECRET_KEY: ${GITEA_KEY:?Gitea secret key is missing}
+      GITEA__security__INTERNAL_TOKEN: ${GITEA_TOKEN:?Gitea internal token is missing}
     networks:
       - default
-      - exposed
+      - outgoing
       - proxy
       - smtp
     labels:
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=3000"
-
-  postgres:
-    extends:
-      file: ../fragments/services.yml
-      service: postgres
-
-networks:
-  deafault:
-    internal: true
-  exposed:
-    external: true
-  proxy:
-    external: true
-  smtp:
-    external: true

@@ -1,8 +1,9 @@
 x-settings:
 
   labels:
-    - &version "tech.sowi.homelab.fragments.version=0.5"
+    - &version "tech.sowi.homelab.fragments.version=0.6"
     - &traefik "traefik.enable=true"
+    - &traefik-port "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=${HTTP_PORT:-80}"
     - &traefik-svc "traefik.http.routers.${COMPOSE_PROJECT_NAME}.service=${COMPOSE_PROJECT_NAME}"
     - &traefik-entry "traefik.http.routers.${COMPOSE_PROJECT_NAME}.entrypoints=http,https"
     - &traefik-rule-glb "traefik.http.routers.${COMPOSE_PROJECT_NAME}.rule=${DOMAIN_OVERRIDE:+Host(`${DOMAIN_OVERRIDE:-}`) || }Host(`${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:?Compose FQDN missing}`)${OPTIONAL_ROUTER_RULES:+ || ${OPTIONAL_ROUTER_RULES:-}}"
@@ -19,13 +20,9 @@ x-settings:
 
 services:
 
-  stub-healthcheck:
-    healthcheck: *healthcheck-base
-
   service: &svc
     restart: unless-stopped
-    labels:
-      - *version
+    labels: [*version]
 
   service-main: &svc-main
     <<: *svc
@@ -42,12 +39,7 @@ services:
 
   service-main-web-glb: &svc-main-web-glb
     <<: *svc-main-web
-    labels:
-      - *version
-      - *traefik
-      - *traefik-svc
-      - *traefik-entry
-      - *traefik-rule-glb
+    labels: [*version, *traefik, *traefik-port, *traefik-svc, *traefik-entry, *traefik-rule-glb]
 
   service-main-web-glb-hc:
     <<: *svc-main-web-glb
@@ -55,12 +47,7 @@ services:
 
   service-main-web-loc: &svc-main-web-loc
     <<: *svc-main-web
-    labels:
-      - *version
-      - *traefik
-      - *traefik-svc
-      - *traefik-entry
-      - *traefik-rule-loc
+    labels: [*version, *traefik, *traefik-svc, *traefik-entry, *traefik-rule-loc]
 
   service-main-web-loc-hc:
     <<: *svc-main-web-loc
@@ -129,12 +116,26 @@ services:
       MYSQL_USER: ${DB_USER:-${COMPOSE_PROJECT_NAME}}
       MYSQL_PASSWORD: ${DB_PASS:-}
 
+  mysql:
+    <<: *svc-sub-hc
+    container_name: ${COMPOSE_PROJECT_NAME}-db
+    image: mysql:${MYSQL_TAG:-latest}
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+    volumes:
+      - ${MYSQL_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/db}:/var/lib/mysql:Z
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASS:-}
+      MYSQL_DATABASE: ${DB_NAME:-${COMPOSE_PROJECT_NAME}}
+      MYSQL_USER: ${DB_USER:-${COMPOSE_PROJECT_NAME}}
+      MYSQL_PASSWORD: ${DB_PASS:-}
+
   mongo:
     <<: *svc-sub-hc
     container_name: ${COMPOSE_PROJECT_NAME}-db
     image: mongo:${MONGO_TAG:-latest}
     healthcheck:
-      test: echo 'db.runCommand("ping").ok' | mongosh mongodb://${DB_USER}:${DB_PASS}@localhost:27017/test?authSource=${DB_NAME} --quiet
+      test: echo 'db.runCommand("ping").ok' | mongosh mongodb://${DB_USER:-${COMPOSE_PROJECT_NAME}}:${DB_PASS:-}@localhost:27017/test?authSource=${DB_NAME:-${COMPOSE_PROJECT_NAME}} --quiet
     volumes:
       - ${MONGO_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/db}:/data/db:Z
     environment:

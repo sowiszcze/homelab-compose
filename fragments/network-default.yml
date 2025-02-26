@@ -2,4 +2,4 @@ networks:
   default:
     internal: true
     labels:
-      - "tech.sowi.homelab.fragments.version=0.5"
+      - "tech.sowi.homelab.fragments.version=0.6"

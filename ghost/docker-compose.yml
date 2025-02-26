@@ -1,9 +1,16 @@
 name: ${STACK_NAME:-ghost}
 
+include:
+  - ../fragments/network-default.yml
+  - ../fragments/network-outgoing.yml
+  - ../fragments/network-proxy.yml
+  - ../fragments/network-smtp.yml
+  - ../fragments/service-mysql.yml
+
 services:
 
   ghost:
-    image: ghost:${GHOST_VERSION:-alpine}
+    image: ghost:${GHOST_TAG:-alpine}
     extends:
       file: ../fragments/services.yml
       service: service-main-web-glb
@@ -15,16 +22,16 @@ services:
       database__connection__user: ${DB_USER:-root}
       database__connection__password: ${DB_PASS:?Database password has to be set}
       database__connection__database: ${DB_NAME:-${COMPOSE_PROJECT_NAME}}
-      mail__from: ${GHOST_MAIL_FROM:-support@example.com}
-      mail__transport: ${GHOST_MAIL_TRANSPORT:-SMTP}
-      mail__options__service: ${GHOST_MAIL_SERVICE:-}
-      mail__options__host: ${GHOST_MAIL_HOST}
-      mail__options__port: ${GHOST_MAIL_PORT:-465}
-      mail__options__secure: ${GHOST_MAIL_USETLS:-true}
-      mail__options__auth__user: ${GHOST_MAIL_USER}
-      mail__options__auth__pass: ${GHOST_MAIL_PASS}
+      mail__from: ${MAIL_FROM:-support@example.com}
+      mail__transport: ${MAIL_PROT:-SMTP}
+      mail__options__service: ${MAIL_SERV:-}
+      mail__options__host: ${MAIL_HOST:-}
+      mail__options__port: ${MAIL_PORT:-465}
+      mail__options__secure: ${MAIL_USETLS:-true}
+      mail__options__auth__user: ${MAIL_USER:-}
+      mail__options__auth__pass: ${MAIL_PASS:-}
     volumes:
-      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}/content:/var/lib/ghost/content
+      - ${CONTENT_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/content}:/var/lib/ghost/content
     networks:
       default:
         priority: 40
@@ -43,28 +50,3 @@ services:
         condition: service_started
     labels:
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=2368"
-
-  mysql:
-    container_name: ${COMPOSE_PROJECT_NAME}-db
-    image: mysql:${GHOST_DB_VERSION:-8.0}
-    extends:
-      file: ../fragments/services.yml
-      service: service-sub
-    environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASS}
-    volumes:
-      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}/db:/var/lib/mysql
-    networks:
-      - default
-
-networks:
-  default:
-    internal: true
-  outgoing:
-    driver: bridge
-    driver_opts:
-      com.docker.network.bridge.enable_icc: "false"
-  proxy:
-    external: true
-  smtp:
-    external: true

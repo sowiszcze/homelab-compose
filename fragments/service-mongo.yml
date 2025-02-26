@@ -1,0 +1,5 @@
+services:
+  mongo:
+    extends:
+      file: ./services.yml
+      service: mongo

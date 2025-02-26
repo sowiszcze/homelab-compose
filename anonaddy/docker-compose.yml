@@ -4,6 +4,8 @@ include:
   - ../fragments/network-default.yml
   - ../fragments/network-proxy.yml
   - ../fragments/network-outgoing.yml
+  - ../fragments/service-mariadb.yml
+  - ../fragments/service-valkey-persistent.yml
 
 services:
 
@@ -58,18 +60,3 @@ services:
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-nginx.service=${COMPOSE_PROJECT_NAME}-nginx"
       - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-nginx.entrypoints=http,https"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}-nginx.loadbalancer.server.port=80"
-
-  mariadb:
-    extends:
-      file: ../fragments/services.yml
-      service: mariadb
-    image: mariadb:${ANONADDY_MARIA_TAG:-10.5}
-    command:
-      - "mysqld"
-      - "--character-set-server=utf8mb4"
-      - "--collation-server=utf8mb4_unicode_ci"
-
-  valkey:
-    extends:
-      file: ../fragments/services.yml
-      service: valkey-persistent

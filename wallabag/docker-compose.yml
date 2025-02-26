@@ -5,18 +5,10 @@ include:
   - ../fragments/network-proxy.yml
   - ../fragments/network-smtp.yml
   - ../fragments/network-outgoing.yml
+  - ../fragments/service-valkey-persistent.yml
+  - ../fragments/service-mariadb.yml
 
 services:
-
-  db:
-    extends:
-      file: ../fragments/services.yml
-      service: mariadb
-
-  kv:
-    extends:
-      file: ../fragments/services.yml
-      service: valkey-persistent
 
   wallabag:
     extends:
@@ -24,9 +16,9 @@ services:
       service: service-main-web-glb-hc
     image: wallabag/wallabag:${WALLABAG_TAG:-latest}
     depends_on:
-      db:
+      mariadb:
         condition: service_healthy
-      kv:
+      valkey:
         condition: service_healthy
     env_file: stack.env
     networks:
