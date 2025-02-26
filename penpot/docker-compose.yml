@@ -55,6 +55,10 @@ services:
       - outgoing
       - smtp
       - s3
+    dns:
+      - 1.1.1.1 # Cloudflare
+      - 208.67.222.222 # OpenDNS
+      - 94.140.14.14 # AdGuard
     environment:
       - PENPOT_FLAGS=${PENPOT_BACK_FLAGS:-enable-registration enable-login-with-password disable-email-verification enable-smtp enable-prepl-server}
       - PENPOT_SECRET_KEY=${PENPOT_SECRET:?Penpot secret not set}
@@ -102,6 +106,12 @@ services:
         condition: service_healthy
     healthcheck:
       test: "curl --silent --fail http://localhost:6061/readyz | grep -qz OK || exit 1"
+    networks:
+      - outgoing
+    dns:
+      - 1.1.1.1 # Cloudflare
+      - 208.67.222.222 # OpenDNS
+      - 94.140.14.14 # AdGuard
     environment:
       - PENPOT_PUBLIC_URI=http://${COMPOSE_PROJECT_NAME}-frontend:8080
       - PENPOT_REDIS_URI=${PENPOT_REDIS_ADDR:-redis://${COMPOSE_PROJECT_NAME}-kv/0}
