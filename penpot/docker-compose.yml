@@ -53,12 +53,7 @@ services:
       test: "curl --silent --fail http://localhost:6060/readyz | grep -qz OK || exit 1"
     networks:
       - outgoing
-      - smtp
       - s3
-    dns:
-      - 1.1.1.1 # Cloudflare
-      - 208.67.222.222 # OpenDNS
-      - 94.140.14.14 # AdGuard
     environment:
       - PENPOT_FLAGS=${PENPOT_BACK_FLAGS:-enable-registration enable-login-with-password disable-email-verification enable-smtp enable-prepl-server}
       - PENPOT_SECRET_KEY=${PENPOT_SECRET:?Penpot secret not set}
@@ -75,14 +70,14 @@ services:
       - PENPOT_STORAGE_ASSETS_S3_ENDPOINT
       - PENPOT_STORAGE_ASSETS_S3_BUCKET
       - PENPOT_TELEMETRY_ENABLED=false
-      - PENPOT_SMTP_DEFAULT_FROM
-      - PENPOT_SMTP_DEFAULT_REPLY_TO
-      - PENPOT_SMTP_HOST
-      - PENPOT_SMTP_PORT
-      - PENPOT_SMTP_USERNAME
-      - PENPOT_SMTP_PASSWORD
-      - PENPOT_SMTP_TLS
-      - PENPOT_SMTP_SSL
+      - PENPOT_SMTP_DEFAULT_FROM=${MAIL_FROM:-}
+      - PENPOT_SMTP_DEFAULT_REPLY_TO=${MAIL_REPLY_TO}
+      - PENPOT_SMTP_HOST=${MAIL_HOST:-}
+      - PENPOT_SMTP_PORT=${MAIL_PORT:-}
+      - PENPOT_SMTP_USERNAME=${MAIL_USER:-}
+      - PENPOT_SMTP_PASSWORD=${MAIL_PASS:-}
+      - PENPOT_SMTP_TLS=${MAIL_TLS:-}
+      - PENPOT_SMTP_SSL=${MAIL_SSL:-}
       - PENPOT_OIDC_CLIENT_ID
       - PENPOT_OIDC_BASE_URI
       - PENPOT_OIDC_CLIENT_SECRET
@@ -108,10 +103,6 @@ services:
       test: "curl --silent --fail http://localhost:6061/readyz | grep -qz OK || exit 1"
     networks:
       - outgoing
-    dns:
-      - 1.1.1.1 # Cloudflare
-      - 208.67.222.222 # OpenDNS
-      - 94.140.14.14 # AdGuard
     environment:
       - PENPOT_PUBLIC_URI=http://${COMPOSE_PROJECT_NAME}-frontend:8080
       - PENPOT_REDIS_URI=${PENPOT_REDIS_ADDR:-redis://${COMPOSE_PROJECT_NAME}-kv/0}
