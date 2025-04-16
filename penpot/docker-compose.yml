@@ -28,11 +28,13 @@ services:
       test: "(curl --fail --silent http://localhost:8080/ > /dev/null) || exit 1"
     networks:
       - default
+      - outgoing
     environment:
       PENPOT_FLAGS: ${PENPOT_FRONT_FLAGS:-enable-registration enable-login-with-password}
       PENPOT_BACKEND_URI: http://${COMPOSE_PROJECT_NAME}-backend:6060
       PENPOT_EXPORTER_URI: http://${COMPOSE_PROJECT_NAME}-exporter:6061
       PENPOT_HTTP_SERVER_MAX_BODY_SIZE: 31457280
+      PENPOT_HTTP_SERVER_MAX_MULTIPART_BODY_SIZE: 367001600
     labels:
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8080"
 
