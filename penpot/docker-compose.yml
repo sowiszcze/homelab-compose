@@ -36,7 +36,7 @@ services:
       PENPOT_HTTP_SERVER_MAX_BODY_SIZE: 31457280
       PENPOT_HTTP_SERVER_MAX_MULTIPART_BODY_SIZE: 367001600
     labels:
-      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8080"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=80"
 
   backend:
     container_name: ${COMPOSE_PROJECT_NAME}-backend
@@ -67,6 +67,8 @@ services:
       - PENPOT_REDIS_URI=${PENPOT_REDIS_ADDR:-redis://${COMPOSE_PROJECT_NAME}-kv/0}
       - PENPOT_ASSETS_STORAGE_BACKEND=${PENPOT_STORAGE:-assets-fs}
       - PENPOT_STORAGE_ASSETS_FS_DIRECTORY=/opt/data/assets
+      - PENPOT_HTTP_SERVER_MAX_BODY_SIZE=31457280
+      - PENPOT_HTTP_SERVER_MAX_MULTIPART_BODY_SIZE=367001600
       - AWS_ACCESS_KEY_ID
       - AWS_SECRET_ACCESS_KEY
       - PENPOT_STORAGE_ASSETS_S3_ENDPOINT
