@@ -94,4 +94,4 @@ services:
       valkey:
         condition: service_healthy
     labels:
-      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=3000"
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=5000"
