@@ -1,0 +1,97 @@
+name: ${STACK_NAME:-postiz}
+
+include:
+  - ../fragments/network-default.yml
+  - ../fragments/network-outgoing.yml
+  - ../fragments/network-proxy.yml
+  - ../fragments/network-s3.yml
+  - ../fragments/service-postgres.yml
+  - ../fragments/service-valkey-persistent.yml
+
+services:
+
+  postiz:
+    image: ghcr.io/gitroomhq/postiz-app:${POSTIZ_TAG:-latest}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
+    environment:
+      # === Required Settings
+      MAIN_URL: "https://${DOMAIN_OVERRIDE:-${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}}"
+      FRONTEND_URL: "https://${DOMAIN_OVERRIDE:-${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}}"
+      NEXT_PUBLIC_BACKEND_URL: "https://${DOMAIN_OVERRIDE:-${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}}/api"
+      JWT_SECRET: "${JWT_SECRET:?JWT secret is required}"
+      DATABASE_URL: "postgresql://${DB_USER:-${COMPOSE_PROJECT_NAME}}:${DB_PASS:-}@${COMPOSE_PROJECT_NAME}-db:5432/${DB_NAME:-${COMPOSE_PROJECT_NAME}}"
+      REDIS_URL: "redis://${COMPOSE_PROJECT_NAME}-kv:6379"
+      BACKEND_INTERNAL_URL: "http://localhost:3000"
+      IS_GENERAL: "true"
+      DISABLE_REGISTRATION: ${REGISTRATION_DISABLED:-"false"}
+      # === Storage Settings
+      STORAGE_PROVIDER: "local"
+      UPLOAD_DIRECTORY: "/uploads"
+      NEXT_PUBLIC_UPLOAD_DIRECTORY: "/uploads"
+      # === Social Media API Settings
+      X_API_KEY: "${X_KEY:-}"
+      X_API_SECRET: "${X_SECRET:-}"
+      LINKEDIN_CLIENT_ID: "${LINKEDIN_ID:-}"
+      LINKEDIN_CLIENT_SECRET: "${LINKEDIN_SECRET:-}"
+      REDDIT_CLIENT_ID: "${REDDIT_ID:-}"
+      REDDIT_CLIENT_SECRET: "${REDDIT_SECRET:-}"
+      GITHUB_CLIENT_ID: "${GITHUB_ID:-}"
+      GITHUB_CLIENT_SECRET: "${GITHUB_SECRET:-}"
+      BEEHIIVE_API_KEY: "${BEEHIIVE_KEY:-}"
+      BEEHIIVE_PUBLICATION_ID: "${BEEHIIVE_PUBLICATION_ID:-}"
+      LISTMONK_DOMAIN: "${LISTMONK_DOMAIN:-}"
+      LISTMONK_USER: "${LISTMONK_USER:-}"
+      LISTMONK_API_KEY: "${LISTMONK_KEY:-}"
+      LISTMONK_LIST_ID: "${LISTMONK_ID:-}"
+      THREADS_APP_ID: "${THREADS_ID:-}"
+      THREADS_APP_SECRET: "${THREADS_SECRET:-}"
+      FACEBOOK_APP_ID: "${FACEBOOK_ID:-}"
+      FACEBOOK_APP_SECRET: "${FACEBOOK_SECRET:-}"
+      YOUTUBE_CLIENT_ID: "${YOUTUBE_ID:-}"
+      YOUTUBE_CLIENT_SECRET: "${YOUTUBE_SECRET:-}"
+      TIKTOK_CLIENT_ID: "${TIKTOK_ID:-}"
+      TIKTOK_CLIENT_SECRET: "${TIKTOK_SECRET:-}"
+      PINTEREST_CLIENT_ID: "${PINTEREST_ID:-}"
+      PINTEREST_CLIENT_SECRET: "${PINTEREST_SECRET:-}"
+      DRIBBBLE_CLIENT_ID: "${DRIBBBLE_ID:-}"
+      DRIBBBLE_CLIENT_SECRET: "${DRIBBBLE_SECRET:-}"
+      DISCORD_CLIENT_ID: "${DISCORD_ID:-}"
+      DISCORD_CLIENT_SECRET: "${DISCORD_SECRET:-}"
+      DISCORD_BOT_TOKEN_ID: "${DISCORD_BOT_TOKEN:-}"
+      SLACK_ID: "${SLACK_ID:-}"
+      SLACK_SECRET: "${SLACK_SECRET:-}"
+      SLACK_SIGNING_SECRET: "${SLACK_SIGNING_SECRET:-}"
+      MASTODON_URL: "${MASTODON_INSTANCE:-}"
+      MASTODON_CLIENT_ID: "${MASTODON_ID:-}"
+      MASTODON_CLIENT_SECRET: "${MASTODON_SECRET:-}"
+      # === OAuth & Authentik Settings
+      NEXT_PUBLIC_POSTIZ_OAUTH_DISPLAY_NAME: "${OIDC_NAME:-Authentik}"
+      NEXT_PUBLIC_POSTIZ_OAUTH_LOGO_URL: "${OIDC_IMAGE:-https://raw.githubusercontent.com/walkxcode/dashboard-icons/master/png/authentik.png}"
+      POSTIZ_GENERIC_OAUTH: "${OIDC_GENERIC:-false}"
+      POSTIZ_OAUTH_URL: "${OIDC_URL:-https://auth.${COMPOSE_DOMAIN}}"
+      POSTIZ_OAUTH_AUTH_URL: "${OIDC_AUTH:-${OIDC_URL:-https://auth.${COMPOSE_DOMAIN}}/application/o/authorize}"
+      POSTIZ_OAUTH_TOKEN_URL: "${OIDC_TOKEN:-${OIDC_URL:-https://auth.${COMPOSE_DOMAIN}}/application/o/token}"
+      POSTIZ_OAUTH_USERINFO_URL: "${OIDC_USERINFO:-${OIDC_URL:-https://auth.${COMPOSE_DOMAIN}}/application/o/userinfo}"
+      POSTIZ_OAUTH_CLIENT_ID: "${OIDC_ID:-}"
+      POSTIZ_OAUTH_CLIENT_SECRET: "${OIDC_SECRET:-}"
+      # === Misc Settings
+      OPENAI_API_KEY: "${OPENAI_KEY:-}"
+      NEXT_PUBLIC_DISCORD_SUPPORT: "${DISCORD_SUPPORT:-}"
+      NEXT_PUBLIC_POLOTNO: "${POLOTNO_KEY:-}"
+      API_LIMIT: "${API_LIMIT:-30}"
+    volumes:
+      - ${PROJECT_CONF_DIR:-${CONF_DIR:-/etc}/${COMPOSE_PROJECT_NAME}}:/config/
+      - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}:/uploads/
+    networks:
+      - default
+      - outgoing
+      - s3
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=500"
