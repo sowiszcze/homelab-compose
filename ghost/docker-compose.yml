@@ -16,6 +16,7 @@ services:
       service: service-main-web-glb
     environment:
       # see https://ghost.org/docs/config/#configuration-options
+      NODE_ENV: production
       url: https://${DOMAIN_OVERRIDE:-${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}}
       database__client: ${GHOST_DB_ENGINE:-mysql}
       database__connection__host: ${DB_HOST:-${COMPOSE_PROJECT_NAME}-db}
@@ -41,12 +42,64 @@ services:
         priority: 20
       outgoing:
         priority: 10
-    dns:
+    dns: &dns-servers
       - 1.1.1.1 # Cloudflare
       - 208.67.222.222 # OpenDNS
       - 94.140.14.14 # AdGuard
     depends_on:
       mysql:
         condition: service_started
+      activitypub:
+        condition: service_started
     labels:
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=2368"
+
+  activitypub:
+    container_name: ${COMPOSE_PROJECT_NAME}-activitypub
+    image: ghcr.io/tryghost/activitypub:${GHOST_ACTIVITYPUB_TAG:-1}
+    extends:
+      file: ../fragments/services.yml
+      service: service-sub
+    volumes:
+      - ${CONTENT_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/content}:/opt/activitypub/content
+    environment:
+      # See https://github.com/TryGhost/ActivityPub/blob/main/docs/env-vars.md
+      NODE_ENV: production
+      MYSQL_HOST: ${DB_HOST:-${COMPOSE_PROJECT_NAME}-db}
+      MYSQL_USER: ${DB_USER:-root}
+      MYSQL_PASSWORD: ${DB_PASS:-}
+      MYSQL_DATABASE: activitypub
+      LOCAL_STORAGE_PATH: /opt/activitypub/content/images/activitypub
+      LOCAL_STORAGE_HOSTING_URL: https://${ACTIVITYPUB_DOMAIN_OVERRIDE:-${COMPOSE_PROJECT_NAME}-activitypub.${COMPOSE_DOMAIN:-}}/content/images/activitypub
+    depends_on:
+      mysql:
+        condition: service_healthy
+      activitypub-migrate:
+        condition: service_completed_successfully
+    networks:
+      default:
+        priority: 40
+      proxy:
+        priority: 20
+      outgoing:
+        priority: 10
+    dns: *dns-servers
+    labels:
+    - "traefik.enable=true"
+    - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8080"
+    - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-activitypub.service=${COMPOSE_PROJECT_NAME}-activitypub"
+    - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-activitypub.entrypoints=http,https"
+    - "traefik.http.routers.${COMPOSE_PROJECT_NAME}-activitypub.rule=${ACTIVITYPUB_DOMAIN_OVERRIDE:+Host(`${ACTIVITYPUB_DOMAIN_OVERRIDE:-}`) || }Host(`${COMPOSE_PROJECT_NAME}-activitypub.${COMPOSE_DOMAIN:?Compose FQDN missing}`)${OPTIONAL_ACTIVITYPUB_ROUTER_RULES:+ || ${OPTIONAL_ACTIVITYPUB_ROUTER_RULES:-}}"
+
+  activitypub-migrate:
+    container_name: ${COMPOSE_PROJECT_NAME}-activitypub-migrate
+    image: ghcr.io/tryghost/activitypub-migrations:${GHOST_ACTIVITYPUB_MIGRATIONS_TAG:-1}
+    environment:
+      MYSQL_DB: mysql://${DB_USER:-root}:${DB_PASS:-}@tcp(${DB_HOST:-${COMPOSE_PROJECT_NAME}-db}:3306)/activitypub
+    networks:
+      default:
+        priority: 40
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: no
