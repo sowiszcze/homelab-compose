@@ -5,7 +5,6 @@ include:
   - ../fragments/network-outgoing.yml
   - ../fragments/network-proxy.yml
   - ../fragments/network-smtp.yml
-  - ../fragments/service-mysql.yml
 
 services:
 
@@ -55,6 +54,9 @@ services:
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=2368"
 
   mysql:
+    extends:
+      file: ../fragments/services.yml
+      service: mysql
     environment:
       MYSQL_MULTIPLE_DATABASES: activitypub
 
