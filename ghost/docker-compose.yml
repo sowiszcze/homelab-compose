@@ -73,7 +73,7 @@ services:
       LOCAL_STORAGE_HOSTING_URL: https://${ACTIVITYPUB_DOMAIN_OVERRIDE:-${COMPOSE_PROJECT_NAME}-activitypub.${COMPOSE_DOMAIN:-}}/content/images/activitypub
     depends_on:
       mysql:
-        condition: service_healthy
+        condition: service_started
       activitypub-migrate:
         condition: service_completed_successfully
     networks:
@@ -101,5 +101,5 @@ services:
         priority: 40
     depends_on:
       mysql:
-        condition: service_healthy
+        condition: service_started
     restart: no
