@@ -70,7 +70,7 @@ services:
       MYSQL_PASSWORD: ${DB_PASS:-}
       MYSQL_DATABASE: activitypub
       LOCAL_STORAGE_PATH: /opt/activitypub/content/images/activitypub
-      LOCAL_STORAGE_HOSTING_URL: https://${ACTIVITYPUB_DOMAIN_OVERRIDE:-${COMPOSE_PROJECT_NAME}-activitypub.${COMPOSE_DOMAIN:-}}/content/images/activitypub
+      LOCAL_STORAGE_HOSTING_URL: https://${DOMAIN_OVERRIDE:-${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN:-}}/content/images/activitypub
     depends_on:
       mysql:
         condition: service_healthy
