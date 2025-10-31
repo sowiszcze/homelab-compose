@@ -5,6 +5,7 @@ include:
   - ../fragments/network-outgoing.yml
   - ../fragments/network-proxy.yml
   - ../fragments/network-smtp.yml
+  - ../fragments/service-mysql.yml
 
 services:
 
@@ -47,18 +48,11 @@ services:
       - 94.140.14.14 # AdGuard
     depends_on:
       mysql:
-        condition: service_started
+        condition: service_healthy
       activitypub:
         condition: service_started
     labels:
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=2368"
-
-  mysql:
-    extends:
-      file: ../fragments/services.yml
-      service: mysql
-    environment:
-      MYSQL_MULTIPLE_DATABASES: activitypub
 
   activitypub:
     container_name: ${COMPOSE_PROJECT_NAME}-activitypub
@@ -79,7 +73,7 @@ services:
       LOCAL_STORAGE_HOSTING_URL: https://${ACTIVITYPUB_DOMAIN_OVERRIDE:-${COMPOSE_PROJECT_NAME}-activitypub.${COMPOSE_DOMAIN:-}}/content/images/activitypub
     depends_on:
       mysql:
-        condition: service_started
+        condition: service_healthy
       activitypub-migrate:
         condition: service_completed_successfully
     networks:
@@ -107,5 +101,5 @@ services:
         priority: 40
     depends_on:
       mysql:
-        condition: service_started
+        condition: service_healthy
     restart: no
