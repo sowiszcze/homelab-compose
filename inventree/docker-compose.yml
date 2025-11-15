@@ -1,0 +1,93 @@
+name: ${STACK_NAME:-inventree}
+
+x-configuration: &configuration
+  INVENTREE_SITE_URL: https://${DOMAIN_OVERRIDE:-${COMPOSE_PROJECT_NAME}.${COMPOSE_DOMAIN}}
+  INVENTREE_USE_X_FORWARDED_HOST: true
+  INVENTREE_USE_X_FORWARDED_PORT: true
+  INVENTREE_USE_X_FORWARDED_PROTO: true
+  INVENTREE_SECRET_KEY: ${SECRET_KEY:?Secret key must be set}
+  INVENTREE_OIDC_PRIVATE_KEY: ${OIDC_PRIVATE_KEY:-}
+  INVENTREE_DB_ENGINE: postgres
+  INVENTREE_DB_NAME: ${DB_NAME:-${COMPOSE_PROJECT_NAME}}
+  INVENTREE_DB_USER: ${DB_USER:-${COMPOSE_PROJECT_NAME}}
+  INVENTREE_DB_PASSWORD: ${DB_PASS:?Database password has to be set}
+  INVENTREE_DB_HOST: ${COMPOSE_PROJECT_NAME}-db
+  INVENTREE_DB_PORT: 5432
+  INVENTREE_CACHE_ENABLED: true
+  INVENTREE_CACHE_HOST: ${COMPOSE_PROJECT_NAME}-valkey
+  INVENTREE_EMAIL_HOST: ${MAIL_HOST:-}
+  INVENTREE_EMAIL_PORT: ${MAIL_PORT:-}
+  INVENTREE_EMAIL_USERNAME: ${MAIL_USER:-}
+  INVENTREE_EMAIL_PASSWORD: ${MAIL_PASS:-}
+  INVENTREE_EMAIL_TLS: ${MAIL_USETLS:-false}
+  INVENTREE_EMAIL_SSL: ${MAIL_USESSL:-false}
+  INVENTREE_EMAIL_SENDER: ${MAIL_FROM:-}
+  INVENTREE_STORAGE_TARGET: ${STORAGE_TARGET:-local}
+  INVENTREE_S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+  INVENTREE_S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+  INVENTREE_S3_BUCKET_NAME: ${S3_BUCKET_NAME:-}
+  INVENTREE_S3_REGION_NAME: ${S3_REGION_NAME:-}
+  INVENTREE_S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-}
+  INVENTREE_CUSTOM_LOGO: ${CUSTOM_LOGO:-}
+  INVENTREE_CUSTOM_SPLASH: ${CUSTOM_SPLASH:-}
+  INVENTREE_PLUGINS_ENABLED: ${PLUGINS_ENABLED:-false}
+  INVENTREE_SOCIAL_BACKENDS: ${SOCIAL_BACKENDS:-}
+  INVENTREE_SOCIAL_PROVIDERS: ${SOCIAL_PROVIDERS:-}
+
+x-volumes: &volumes
+  - ${INVENTREE_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}/data}:/home/inventree/data:z
+
+include:
+  - ../fragments/network-default.yml
+  - ../fragments/network-outgoing.yml
+  - ../fragments/network-proxy.yml
+  - ../fragments/service-postgres.yml
+  - ../fragments/service-valkey-persistent.yml
+
+services:
+  inventree-server: &inventree-server
+    image: inventree/inventree:${INVENTREE_TAG:-stable}
+    extends:
+      file: ../fragments/services.yml
+      service: service-main-web-glb
+    networks:
+      - default
+      - proxy
+      - outgoing
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      inventree-updater:
+        condition: service_completed_successfully
+    volumes: *volumes
+    environment: *configuration
+    labels:
+      - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=8000"
+
+  inventree-worker:
+    image: inventree/inventree:${INVENTREE_TAG:-stable}
+    extends:
+      file: ../fragments/services.yml
+      service: service-sub
+    container_name: ${COMPOSE_PROJECT_NAME}-worker
+    command: invoke worker
+    depends_on:
+      - inventree-server
+    volumes: *volumes
+    environment: *configuration
+    restart: unless-stopped
+    networks:
+      - outgoing
+
+  inventree-updater:
+    <<: *inventree-server
+    container_name: ${COMPOSE_PROJECT_NAME}-updater
+    command: invoke update
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
