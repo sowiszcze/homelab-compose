@@ -82,6 +82,7 @@ services:
     restart: unless-stopped
     networks:
       - outgoing
+      - s3
 
   inventree-updater:
     <<: *inventree-server
