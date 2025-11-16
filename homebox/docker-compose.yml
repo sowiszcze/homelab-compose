@@ -1,5 +1,12 @@
 name: homebox
 
+include:
+  - ../fragments/network-default.yml
+  - ../fragments/network-outgoing.yml
+  - ../fragments/network-proxy.yml
+  - ../fragments/network-smtp.yml
+  - ../fragments/service-postgres.yml
+
 services:
 
   homebox:
@@ -7,31 +14,44 @@ services:
     extends:
       file: ../fragments/services.yml
       service: service-main-web-glb-hc
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
+      - default
       - proxy
-      - exposed
+      - outgoing
       - smtp
     environment:
-      HBOX_LOG_LEVEL: ${HOMEBOX_LOG_LEVEL:-info}
-      HBOX_LOG_FORMAT: ${HOMEBOX_LOG_FORMAT:-text}
-      HBOX_WEB_MAX_UPLOAD_SIZE: ${HOMEBOX_MAX_UPLOAD:-10}
-      HBOX_OPTIONS_ALLOW_REGISTRATION: ${HOMEBOX_ALLOW_REGISTER:-false}
+      HBOX_LOG_LEVEL: ${LOG_LEVEL:-info}
+      HBOX_LOG_FORMAT: ${LOG_FORMAT:-text}
+      HBOX_WEB_MAX_UPLOAD_SIZE: ${MAX_UPLOAD_SIZE:-10}
+      HBOX_OPTIONS_ALLOW_REGISTRATION: ${ALLOW_REGISTER:-false}
       HBOX_MAILER_HOST: ${SMTP_HOST:-docker-mailserver}
       HBOX_MAILER_PORT: ${SMTP_PORT:-25}
-      HBOX_MAILER_USERNAME: ${HOMEBOX_SMTP_USER}
-      HBOX_MAILER_PASSWORD: ${HOMEBOX_SMTP_PASS}
-      HBOX_MAILER_FROM: ${HOMEBOX_SMTP_FROM:-"Homebox <${COMPOSE_PROJECT_NAME}@${SMTP_HOST}>"}
-      HBOX_OPTIONS_CURRENCY_CONFIG: ${HOMEBOX_CUSTOM_CURRENCIES:+/data/currencies.json}
+      HBOX_MAILER_USERNAME: ${SMTP_USER:-}
+      HBOX_MAILER_PASSWORD: ${SMTP_PASS:-}
+      HBOX_MAILER_FROM: ${SMTP_FROM:-"Homebox <${COMPOSE_PROJECT_NAME}@${SMTP_HOST}>"}
+      HBOX_OPTIONS_CURRENCY_CONFIG: ${CUSTOM_CURRENCIES:+/data/currencies.json}
+      HBOX_DATABASE_DRIVER: ${DB_DRIVER:-postgres}
+      HBOX_DATABASE_HOST: ${COMPOSE_PROJECT_NAME}-db
+      HBOX_DATABASE_PORT: 5432
+      HBOX_DATABASE_DATABASE: ${DB_NAME:-${COMPOSE_PROJECT_NAME}}
+      HBOX_DATABASE_USER: ${DB_USER:-${COMPOSE_PROJECT_NAME}}
+      HBOX_DATABASE_PASSWORD: ${DB_PASS:-}
+      HBOX_LABEL_MAKER_WIDTH: ${LABEL_WIDTH:-526}
+      HBOX_LABEL_MAKER_HEIGHT: ${LABEL_HEIGHT:-200}
+      HBOX_LABEL_MAKER_PADDING: ${LABEL_PADDING:-32}
+      HBOX_LABEL_MAKER_FONT_SIZE: ${LABEL_FONT_SIZE:-32.0}
+      HBOX_LABEL_MAKER_PRINT_COMMAND: ${LABEL_PRINT_COMMAND:-}
+      HBOX_LABEL_MAKER_DYNAMIC_LENGTH: ${LABEL_DYNAMIC_LENGTH:-true}
+      HBOX_LABEL_MAKER_ADDITIONAL_INFORMATION: ${LABEL_ADDITIONAL_INFORMATION:-}
+      HBOX_LABEL_MAKER_REGULAR_FONT_PATH: ${LABEL_REGULAR_FONT_PATH:-}
+      HBOX_LABEL_MAKER_BOLD_FONT_PATH: ${LABEL_BOLD_FONT_PATH:-}
+      HBOX_THUMBNAIL_ENABLED: ${THUMBNAIL_ENABLED:-true}
+      HBOX_THUMBNAIL_WIDTH: ${THUMBNAIL_WIDTH:-500}
+      HBOX_THUMBNAIL_HEIGHT: ${THUMBNAIL_HEIGHT:-500}
     volumes:
       - ${PROJECT_DATA_DIR:-${DATA_DIR:-/srv}/${COMPOSE_PROJECT_NAME}}:/data
     labels:
-      - "traefik.http.routers.${COMPOSE_PROJECT_NAME}.middlewares=${AUTH_MIDDLEWARE:?Auth middleware is not defined}"
       - "traefik.http.services.${COMPOSE_PROJECT_NAME}.loadbalancer.server.port=7745"
-
-networks:
-  proxy:
-    external: true
-  exposed:
-    external: true
-  smtp:
-    external: true
