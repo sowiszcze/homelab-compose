@@ -27,7 +27,7 @@ x-configuration: &configuration
   INVENTREE_S3_SECRET_KEY: ${S3_SECRET_KEY:-}
   INVENTREE_S3_BUCKET_NAME: ${S3_BUCKET_NAME:-}
   INVENTREE_S3_REGION_NAME: ${S3_REGION_NAME:-}
-  INVENTREE_S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-}
+  INVENTREE_S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-minio}
   INVENTREE_CUSTOM_LOGO: ${CUSTOM_LOGO:-}
   INVENTREE_CUSTOM_SPLASH: ${CUSTOM_SPLASH:-}
   INVENTREE_PLUGINS_ENABLED: ${PLUGINS_ENABLED:-false}
@@ -41,6 +41,7 @@ include:
   - ../fragments/network-default.yml
   - ../fragments/network-outgoing.yml
   - ../fragments/network-proxy.yml
+  - ../fragments/network-s3.yml
   - ../fragments/service-postgres.yml
   - ../fragments/service-valkey-persistent.yml
 
@@ -54,6 +55,7 @@ services:
       - default
       - proxy
       - outgoing
+      - s3
     depends_on:
       postgres:
         condition: service_healthy
